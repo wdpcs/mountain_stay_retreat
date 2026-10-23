@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://wdpcs.github.io/mountain_stay_retreat",
+  "homepage": "https://rooms.wdpcs.in",
   "scripts": {
     "dev": "vite",
     "server": "node Server/Server.js",
