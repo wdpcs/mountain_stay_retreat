@@ -56,7 +56,7 @@ export default function AdminApp() {
     }
   }, []);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     if (token) {
       try {
         await fetch(`${API_BASE_URL}/api/admin/logout`, {
@@ -71,7 +71,7 @@ export default function AdminApp() {
     sessionStorage.removeItem('wdpcs_admin_user');
     setToken(null);
     setCurrentUser(null);
-  };
+  }, [token]);
 
   const fetchStats = useCallback(async () => {
     if (!token) return;
@@ -90,7 +90,7 @@ export default function AdminApp() {
     } catch (err) {
       console.warn('Failed to fetch stats:', err);
     }
-  }, [token]);
+  }, [token, handleLogout]);
 
   const fetchBookings = useCallback(async () => {
     if (!token) return;

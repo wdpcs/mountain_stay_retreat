@@ -1126,7 +1126,11 @@ app.get('/api/admin/reports', requireAuth(), (req, res) => {
 
 // User & Role Management (Super Admin only)
 app.get('/api/admin/users', requireAuth(['admin']), (req, res) => {
-  const sanitizedUsers = staffUsers.map(({ passwordHash, ...rest }) => rest);
+  const sanitizedUsers = staffUsers.map((user) => {
+    const copy = { ...user };
+    delete copy.passwordHash;
+    return copy;
+  });
   res.json({ success: true, users: sanitizedUsers });
 });
 
@@ -1156,7 +1160,8 @@ app.post('/api/admin/users', requireAuth(['admin']), (req, res) => {
   staffUsers.push(newUser);
   logAuditEvent(req.adminUser, 'CREATE_USER', 'User', newUser.id, `Created staff user ${newUser.username} with role ${newUser.role}`, req);
 
-  const { passwordHash, ...sanitized } = newUser;
+  const sanitized = { ...newUser };
+  delete sanitized.passwordHash;
   res.status(201).json({ success: true, user: sanitized });
 });
 

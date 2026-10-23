@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { API_BASE_URL, SOCIETY_INFO } from '../config';
+import { API_BASE_URL } from '../config';
 
 export default function AdminSettings({ token, currentUser }) {
   const [settings, setSettings] = useState(null);

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { API_BASE_URL, SOCIETY_INFO } from '../config';
+import { API_BASE_URL } from '../config';
 
 export default function AdminLogin({ onLoginSuccess }) {
   const [username, setUsername] = useState('admin');

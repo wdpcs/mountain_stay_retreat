@@ -1,8 +1,4 @@
-import { useState } from 'react';
-
 export default function DashboardOverview({ stats, onNavigate, onOpenWalkIn, onStatusChange }) {
-  const [selectedCheckIn, setSelectedCheckIn] = useState(null);
-
   if (!stats) {
     return (
       <div className="flex h-64 items-center justify-center">

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 
-export default function AvailabilityCalendar({ token, onSelectDate }) {
+export default function AvailabilityCalendar({ token }) {
   const [calendarDays, setCalendarDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(null);
@@ -41,7 +41,7 @@ export default function AvailabilityCalendar({ token, onSelectDate }) {
     const isSelected = selectedDay?.date === day.date;
     const totalAvail = day.suitesAvailable + day.dormAvailable;
 
-    let baseBg = 'border-slate-800 bg-slate-900/60 hover:border-slate-700';
+    let baseBg;
     if (totalAvail === 0) {
       baseBg = 'border-rose-900/40 bg-rose-950/20 hover:border-rose-700/60';
     } else if (day.suitesAvailable <= 1 || day.dormAvailable <= 3) {

@@ -1,9 +1,8 @@
 import { useState, useMemo } from 'react';
-import { API_BASE_URL, SOCIETY_INFO } from '../config';
+import { SOCIETY_INFO } from '../config';
 
 export default function BookingManagement({
   bookings,
-  token,
   onRefresh,
   onOpenWalkIn,
   onStatusChange,
