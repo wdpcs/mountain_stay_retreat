@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { API_BASE_URL } from './config';
 
 export default function AdminDashboard({ onSwitchToSite, onLogout }) {
   const [bookings, setBookings] = useState([]);
@@ -47,7 +48,7 @@ export default function AdminDashboard({ onSwitchToSite, onLogout }) {
   }, []);
 
   const fetchBookings = useCallback(() => {
-    fetch('http://localhost:5000/api/bookings')
+    fetch(`${API_BASE_URL}/api/bookings`)
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => setBookings(Array.isArray(data) ? data : []))
       .catch((err) => console.warn('Failed to fetch bookings:', err));
@@ -55,7 +56,7 @@ export default function AdminDashboard({ onSwitchToSite, onLogout }) {
 
   const fetchNotifications = useCallback(async (detectNew = false) => {
     try {
-      const res = await fetch('http://localhost:5000/api/admin/notifications');
+      const res = await fetch(`${API_BASE_URL}/api/admin/notifications`);
       if (res.ok) {
         const data = await res.json();
         if (data && Array.isArray(data.notifications)) {
@@ -84,7 +85,7 @@ export default function AdminDashboard({ onSwitchToSite, onLogout }) {
   const handleMarkAsRead = async (id, e) => {
     if (e) e.stopPropagation();
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/notifications/${id}/read`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/notifications/${id}/read`, {
         method: 'PATCH',
       });
       if (res.ok) {
@@ -100,7 +101,7 @@ export default function AdminDashboard({ onSwitchToSite, onLogout }) {
 
   const handleMarkAllRead = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/admin/notifications/mark-all-read', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/notifications/mark-all-read`, {
         method: 'POST',
       });
       if (res.ok) {
@@ -115,7 +116,7 @@ export default function AdminDashboard({ onSwitchToSite, onLogout }) {
   const handleDeleteNotification = async (id, e) => {
     if (e) e.stopPropagation();
     try {
-      const res = await fetch(`http://localhost:5000/api/admin/notifications/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/notifications/${id}`, {
         method: 'DELETE',
       });
       if (res.ok) {
@@ -142,7 +143,7 @@ export default function AdminDashboard({ onSwitchToSite, onLogout }) {
 
   useEffect(() => {
     let isMounted = true;
-    fetch('http://localhost:5000/api/bookings')
+    fetch(`${API_BASE_URL}/api/bookings`)
       .then((res) => (res.ok ? res.json() : []))
       .then((data) => {
         if (isMounted) {
@@ -156,7 +157,7 @@ export default function AdminDashboard({ onSwitchToSite, onLogout }) {
       });
 
     // Initial fetch notifications
-    fetch('http://localhost:5000/api/admin/notifications')
+    fetch(`${API_BASE_URL}/api/admin/notifications`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (isMounted && data && Array.isArray(data.notifications)) {
@@ -167,7 +168,7 @@ export default function AdminDashboard({ onSwitchToSite, onLogout }) {
       .catch((err) => console.warn('Failed to fetch admin notifications:', err));
 
     // Fetch live prices
-    fetch('http://localhost:5000/api/prices')
+    fetch(`${API_BASE_URL}/api/prices`)
       .then((res) => res.json())
       .then((data) => {
         if (isMounted && data) {
@@ -178,7 +179,7 @@ export default function AdminDashboard({ onSwitchToSite, onLogout }) {
       .catch((err) => console.error('Failed to fetch prices:', err));
 
     // Fetch live maintenance status
-    fetch('http://localhost:5000/api/admin/maintenance')
+    fetch(`${API_BASE_URL}/api/admin/maintenance`)
       .then((res) => res.json())
       .then((data) => {
         if (isMounted && data) {
@@ -207,7 +208,7 @@ export default function AdminDashboard({ onSwitchToSite, onLogout }) {
   const handleSavePrices = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:5000/api/admin/prices', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/prices`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -227,7 +228,7 @@ export default function AdminDashboard({ onSwitchToSite, onLogout }) {
   const handleSaveMaintenance = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:5000/api/admin/maintenance', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/maintenance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -248,7 +249,7 @@ export default function AdminDashboard({ onSwitchToSite, onLogout }) {
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/bookings/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/bookings/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -272,7 +273,7 @@ export default function AdminDashboard({ onSwitchToSite, onLogout }) {
     setDeleteTargetBooking(null);
 
     try {
-      await fetch(`http://localhost:5000/api/bookings/${encodeURIComponent(id)}`, {
+      await fetch(`${API_BASE_URL}/api/bookings/${encodeURIComponent(id)}`, {
         method: 'DELETE',
       });
     } catch (err) {

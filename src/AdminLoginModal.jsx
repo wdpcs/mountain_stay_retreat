@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API_BASE_URL } from './config';
 
 export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess }) {
   const [username, setUsername] = useState('admin');
@@ -15,7 +16,7 @@ export default function AdminLoginModal({ isOpen, onClose, onLoginSuccess }) {
     setIsSubmitting(true);
 
     try {
-      const res = await fetch('http://localhost:5000/api/admin/login', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password }),

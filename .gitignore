@@ -13,8 +13,13 @@ dist-ssr
 *.local
 .env
 .env.*
+Server/.env
+Server/.env.*
 !.env.example
 !Server/.env.example
+
+# Design source files
+public/**/*.psd
 
 # Editor directories and files
 .vscode/*

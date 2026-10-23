@@ -3,6 +3,7 @@ import AdminDashboard from './AdminDashboard';
 import AdminLoginModal from './AdminLoginModal';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
+import { API_BASE_URL } from './config';
 
 const BASE = import.meta.env.BASE_URL || './';
 const getAssetUrl = (path) => {
@@ -94,8 +95,8 @@ export default function StayFacilityWebsite() {
   const fetchAvailability = async (dateStr = '') => {
     try {
       const url = dateStr
-        ? `http://localhost:5000/api/availability?date=${dateStr}`
-        : 'http://localhost:5000/api/availability';
+        ? `${API_BASE_URL}/api/availability?date=${dateStr}`
+        : `${API_BASE_URL}/api/availability`;
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
@@ -113,8 +114,8 @@ export default function StayFacilityWebsite() {
   useEffect(() => {
     let isMounted = true;
     const url = formData.checkInDate
-      ? `http://localhost:5000/api/availability?date=${formData.checkInDate}`
-      : 'http://localhost:5000/api/availability';
+      ? `${API_BASE_URL}/api/availability?date=${formData.checkInDate}`
+      : `${API_BASE_URL}/api/availability`;
 
     fetch(url)
       .then((res) => (res.ok ? res.json() : null))
@@ -207,7 +208,7 @@ export default function StayFacilityWebsite() {
       : `${formData.countryCode || '+91'} ${formData.phone.trim()}`;
 
     try {
-      const res = await fetch('http://localhost:5000/book-counter', {
+      const res = await fetch(`${API_BASE_URL}/book-counter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
