@@ -6,12 +6,18 @@
   "homepage": "https://rooms.wdpcs.in",
   "scripts": {
     "dev": "vite",
+    "dev:admin": "vite --config admin/vite.config.js admin",
     "server": "node Server/Server.js",
     "build": "vite build",
+    "build:guest": "vite build",
+    "build:admin": "vite build admin --config admin/vite.config.js",
+    "build:all": "vite build && vite build admin --config admin/vite.config.js",
     "lint": "eslint .",
     "preview": "vite preview",
-    "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist"
+    "preview:admin": "vite preview admin --config admin/vite.config.js",
+    "deploy": "gh-pages -d dist",
+    "deploy:guest": "gh-pages -d dist",
+    "deploy:admin": "gh-pages -d admin/dist -b gh-pages-admin"
   },
   "dependencies": {
     "cors": "^2.8.6",

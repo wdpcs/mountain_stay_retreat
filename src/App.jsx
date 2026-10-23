@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-import AdminDashboard from './AdminDashboard';
-import AdminLoginModal from './AdminLoginModal';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { API_BASE_URL } from './config';
@@ -59,8 +57,6 @@ const fallbackImage = getAssetUrl('Images/Rooms/1.jpg');
 const generateRefId = (prefix) => `${prefix}-${Date.now().toString().slice(-6)}`;
 
 export default function StayFacilityWebsite() {
-  const [currentView, setCurrentView] = useState('guest'); // 'guest' | 'admin'
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [bookingStep, setBookingStep] = useState(1); // 1: Check Availability, 2: Guest Details & Payment Method
   const [availabilityChecked, setAvailabilityChecked] = useState(false);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
@@ -268,15 +264,6 @@ export default function StayFacilityWebsite() {
     }
   };
 
-  if (currentView === 'admin') {
-    return (
-      <AdminDashboard
-        onSwitchToSite={() => setCurrentView('guest')}
-        onLogout={() => setCurrentView('guest')}
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
       {/* Header */}
@@ -312,13 +299,6 @@ export default function StayFacilityWebsite() {
             <a href="#contact" className="hover:text-blue-600">
               Contact
             </a>
-
-            <button
-              onClick={() => setIsLoginModalOpen(true)}
-              className="rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-slate-800 transition flex items-center gap-1.5"
-            >
-              🛡️ Admin Login
-            </button>
           </nav>
         </div>
       </header>
@@ -1000,32 +980,20 @@ export default function StayFacilityWebsite() {
         </div>
       </section>
 
-      {/* Floating Buttons: Admin & WhatsApp */}
-      <button
-        onClick={() => setIsLoginModalOpen(true)}
-        className="fixed bottom-6 left-6 z-50 rounded-full bg-slate-900 px-5 py-3 font-bold text-xs text-white shadow-2xl transition hover:bg-slate-800 flex items-center gap-1.5 border border-slate-700"
-      >
-        <span>🛡️ Admin Portal</span>
-      </button>
-
+      {/* Floating WhatsApp Quick Contact */}
       <a
         href="https://wa.me/918301995940"
         target="_blank"
         rel="noopener noreferrer"
-        className="fixed bottom-6 right-6 z-50 rounded-full bg-green-500 px-6 py-4 font-semibold text-white shadow-2xl transition hover:bg-green-600"
+        className="fixed bottom-6 right-6 z-50 rounded-full bg-green-500 px-6 py-4 font-semibold text-white shadow-2xl transition hover:bg-green-600 flex items-center gap-2"
       >
-        WhatsApp
+        <span>💬</span>
+        <span>WhatsApp</span>
       </a>
 
       {/* Footer */}
-      <footer className="bg-slate-950 py-8 text-center text-sm text-slate-400 flex flex-col sm:flex-row items-center justify-center gap-2">
-        <span>© 2026 Mountain Stay Retreat. All Rights Reserved.</span>
-        <button
-          onClick={() => setIsLoginModalOpen(true)}
-          className="text-slate-600 hover:text-slate-400 text-xs font-mono transition inline-flex items-center gap-1 opacity-60 hover:opacity-100"
-        >
-          🔒 Staff Portal
-        </button>
+      <footer className="bg-slate-950 py-8 text-center text-sm text-slate-400">
+        <span>© 2026 Mountain Stay Retreat — Wayanad District Police Co-operative Society Ltd. No. W 208. All Rights Reserved.</span>
       </footer>
 
       {/* Booking Confirmation Modal */}
@@ -1081,16 +1049,16 @@ export default function StayFacilityWebsite() {
               </div>
             </div>
 
-            {/* Admin Notification Status Banner */}
+            {/* Front Desk Reservation Alert Banner */}
             <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50/80 p-3.5 text-xs text-blue-900 flex items-start gap-2.5">
-              <span className="text-base shrink-0">🔔</span>
+              <span className="text-base shrink-0">🛎️</span>
               <div>
-                <strong className="block font-semibold">Admin Notification Dispatched:</strong>
-                <span>Mountain Stay Retreat front desk and manager console have been alerted to your reservation.</span>
+                <strong className="block font-semibold">Front Desk Reservation Alert:</strong>
+                <span>Mountain Stay Retreat front desk has recorded your booking details. Please present your Booking ID at check-in.</span>
               </div>
             </div>
 
-            {/* Actions: Send to WhatsApp Admin, Print Receipt, Return */}
+            {/* Actions: Send to Reception WhatsApp, Print Receipt, Return */}
             <div className="space-y-2.5">
               <a
                 href={`https://wa.me/918301995940?text=${encodeURIComponent(
@@ -1162,16 +1130,6 @@ export default function StayFacilityWebsite() {
           </div>
         </div>
       )}
-
-      {/* Admin Security Login Modal */}
-      <AdminLoginModal
-        isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
-        onLoginSuccess={() => {
-          setCurrentView('admin');
-          setIsLoginModalOpen(false);
-        }}
-      />
     </div>
   );
 }

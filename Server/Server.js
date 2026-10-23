@@ -3,174 +3,437 @@ import cors from 'cors';
 import Razorpay from 'razorpay';
 import dotenv from 'dotenv';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.join(__dirname, '.env') });
-dotenv.config(); // also check current working directory .env
+dotenv.config();
 
 const app = express();
 
-app.use(cors());
+// ==========================================
+// 1. SECURITY, CORS & SENSITIVE CONFIGURATION
+// ==========================================
+
+const JWT_SECRET = process.env.SESSION_SECRET || 'wdpcs_admin_super_secret_jwt_key_2026_w208_retreat';
+
+// Whitelist only approved origins
+const allowedOrigins = [
+  'https://rooms.wdpcs.in',
+  'https://roomsadmin.wdpcs.in',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
+  'http://127.0.0.1:5000',
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps, curl, or Postman in dev)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+        return callback(null, true);
+      }
+      return callback(new Error('CORS policy: Access denied for this origin.'));
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
+// Razorpay client (Key Secret is NEVER sent to frontend)
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_dummy',
   key_secret: process.env.RAZORPAY_KEY_SECRET || 'dummy_secret',
 });
 
-// In-memory bookings store with seed data
+// ==========================================
+// 2. CRYPTOGRAPHIC TOKEN & AUTH UTILITIES
+// ==========================================
+
+function hashPassword(password) {
+  return crypto.createHash('sha256').update(password + '_wdpcs_salt').digest('hex');
+}
+
+function generateToken(payload) {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const body = Buffer.from(
+    JSON.stringify({
+      ...payload,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 12 * 60 * 60, // 12-hour session
+    })
+  ).toString('base64url');
+  const signature = crypto
+    .createHmac('sha256', JWT_SECRET)
+    .update(`${header}.${body}`)
+    .digest('base64url');
+  return `${header}.${body}.${signature}`;
+}
+
+function verifyToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+
+  const [header, body, signature] = parts;
+  const expectedSignature = crypto
+    .createHmac('sha256', JWT_SECRET)
+    .update(`${header}.${body}`)
+    .digest('base64url');
+
+  if (signature !== expectedSignature) return null;
+
+  try {
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+      return null; // Expired
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+// In-memory brute-force rate limiter on login
+const loginAttempts = new Map(); // ip -> { count, lockedUntil }
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const record = loginAttempts.get(ip);
+  if (!record) return { allowed: true };
+
+  if (record.lockedUntil && record.lockedUntil > now) {
+    const remainingSeconds = Math.ceil((record.lockedUntil - now) / 1000);
+    return {
+      allowed: false,
+      error: `Too many failed attempts. Locked for ${remainingSeconds} seconds.`,
+    };
+  }
+
+  if (record.lockedUntil && record.lockedUntil <= now) {
+    loginAttempts.delete(ip);
+    return { allowed: true };
+  }
+
+  return { allowed: true };
+}
+
+function registerFailedLogin(ip) {
+  const now = Date.now();
+  const record = loginAttempts.get(ip) || { count: 0, firstAttempt: now };
+  record.count += 1;
+
+  if (record.count >= 5) {
+    record.lockedUntil = now + 15 * 60 * 1000; // 15 minute lock
+  }
+  loginAttempts.set(ip, record);
+}
+
+function registerSuccessfulLogin(ip) {
+  loginAttempts.delete(ip);
+}
+
+// Middleware: Authenticate Admin requests
+function requireAuth(allowedRoles = []) {
+  return (req, res, next) => {
+    const authHeader = req.headers.authorization || req.headers['x-admin-token'];
+    let token = null;
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (authHeader) {
+      token = authHeader;
+    }
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        error: 'Authentication required. Missing administrative authorization token.',
+      });
+    }
+
+    const payload = verifyToken(token);
+    if (!payload) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid or expired administrative session token. Please re-authenticate.',
+      });
+    }
+
+    if (allowedRoles.length > 0 && !allowedRoles.includes(payload.role)) {
+      return res.status(403).json({
+        success: false,
+        error: `Forbidden: User role '${payload.role}' lacks permission for this action.`,
+      });
+    }
+
+    req.adminUser = payload;
+    next();
+  };
+}
+
+// ==========================================
+// 3. CENTRAL DATA STORE & SEED DATA
+// ==========================================
+
+const staffUsers = [
+  {
+    id: 'USR-001',
+    username: 'admin',
+    name: 'Chief Security Officer',
+    role: 'admin',
+    passwordHash: hashPassword('admin123'),
+    email: 'admin@wdpcs.in',
+    phone: '+91 83019 95940',
+    active: true,
+    createdAt: '2026-01-01T00:00:00Z',
+  },
+  {
+    id: 'USR-002',
+    username: 'manager',
+    name: 'Retreat Facility Manager',
+    role: 'manager',
+    passwordHash: hashPassword('manager123'),
+    email: 'manager@wdpcs.in',
+    phone: '+91 98450 12345',
+    active: true,
+    createdAt: '2026-01-15T00:00:00Z',
+  },
+  {
+    id: 'USR-003',
+    username: 'reception',
+    name: 'Front Desk Receptionist',
+    role: 'receptionist',
+    passwordHash: hashPassword('reception123'),
+    email: 'reception@wdpcs.in',
+    phone: '+91 97412 67890',
+    active: true,
+    createdAt: '2026-02-01T00:00:00Z',
+  },
+];
+
+const TOTAL_SUITES = 5;
+const TOTAL_DORM_BEDS = 15;
+
+let roomPrices = {
+  suitePrice: 2500,
+  dormPrice: 450,
+};
+
+let maintenanceStatus = {
+  maintenanceSuites: 0,
+  maintenanceDormBeds: 0,
+  suiteMaintenanceReason: '',
+  dormMaintenanceReason: '',
+  updatedAt: new Date().toISOString(),
+};
+
+let societySettings = {
+  societyName: 'Wayanad District Police Co-operative Society Ltd. No. W 208',
+  property: 'Mountain Stay Retreat',
+  address: 'Mananthavady, Wayanad, Kerala 670645',
+  receptionPhone: '+91 83019 95940',
+  managerPhone: '+91 98450 12345',
+  checkInTime: '13:00',
+  checkOutTime: '12:00',
+  razorpayMode: 'test',
+  cancellationPolicy:
+    'Full refund if cancelled at least 24 hours prior to check-in date. Cancellations within 24 hours incur 1-night retention charges.',
+};
+
 let bookings = [
   {
     id: 'MSR-RZP-984210',
     name: 'Anand Kumar',
     email: 'anand.k@gmail.com',
     phone: '+91 98450 12345',
-    date: '2026-07-28',
+    date: '2026-10-24',
     roomType: 'Suite Room (₹2,500/night)',
     amount: 2500,
     paymentMethod: 'Online Pre-payment (Razorpay)',
     status: 'Paid Online',
-    createdAt: new Date('2026-07-24T09:30:00Z').toISOString(),
+    notes: 'Ground floor requested',
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
   },
   {
     id: 'MSR-CTR-482910',
     name: 'Priya Sharma',
     email: 'priya.s@yahoo.com',
     phone: '+91 97412 67890',
-    date: '2026-07-29',
+    date: '2026-10-23',
     roomType: 'Dormitory Bed (₹450/night)',
     amount: 450,
     paymentMethod: 'Pay at Counter / Property',
-    status: 'Pending at Check-in',
-    createdAt: new Date('2026-07-24T10:15:00Z').toISOString(),
+    status: 'Checked In',
+    notes: 'Walk-in booking recorded by reception',
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
   },
   {
     id: 'MSR-RZP-319582',
     name: 'Rohan Mehta',
     email: 'rohan.mehta@outlook.com',
     phone: '+91 99001 23456',
-    date: '2026-07-25',
+    date: '2026-10-25',
     roomType: 'Suite Room (₹2,500/night)',
     amount: 2500,
     paymentMethod: 'Online Pre-payment (Razorpay)',
-    status: 'Checked In',
-    createdAt: new Date('2026-07-23T14:20:00Z').toISOString(),
+    status: 'Paid Online',
+    notes: 'Late arrival around 6:00 PM',
+    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
   },
   {
     id: 'MSR-CTR-109284',
     name: 'Siddharth Nair',
     email: 'siddharth@gmail.com',
     phone: '+91 83019 95940',
-    date: '2026-07-26',
+    date: '2026-10-23',
     roomType: 'Dormitory Bed (₹450/night)',
     amount: 450,
     paymentMethod: 'Pay at Counter / Property',
-    status: 'Paid at Counter',
-    createdAt: new Date('2026-07-24T11:00:00Z').toISOString(),
+    status: 'Pending at Check-in',
+    notes: 'Police Department member guest',
+    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
   },
 ];
 
-// Total Inventory Configuration
-const TOTAL_SUITES = 5;
-const TOTAL_DORM_BEDS = 15;
+let transactions = [
+  {
+    id: 'TXN-984210',
+    orderId: 'order_RZP984210',
+    paymentId: 'pay_984210_captured',
+    bookingId: 'MSR-RZP-984210',
+    guestName: 'Anand Kumar',
+    amount: 2500,
+    paymentMethod: 'UPI / Razorpay',
+    status: 'Captured',
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+  },
+  {
+    id: 'TXN-319582',
+    orderId: 'order_RZP319582',
+    paymentId: 'pay_319582_captured',
+    bookingId: 'MSR-RZP-319582',
+    guestName: 'Rohan Mehta',
+    amount: 2500,
+    paymentMethod: 'Netbanking / Razorpay',
+    status: 'Captured',
+    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
+  },
+  {
+    id: 'TXN-482910',
+    orderId: 'counter_manual',
+    paymentId: 'CASH_REC_4829',
+    bookingId: 'MSR-CTR-482910',
+    guestName: 'Priya Sharma',
+    amount: 450,
+    paymentMethod: 'Cash at Counter',
+    status: 'Captured',
+    createdAt: new Date(Date.now() - 86400000).toISOString(),
+  },
+];
 
-// In-memory Price Configuration
-let roomPrices = {
-  suitePrice: 2500,
-  dormPrice: 450,
-};
+let refunds = [
+  {
+    id: 'REF-101',
+    bookingId: 'MSR-CTR-OLD001',
+    guestName: 'Kavitha Unni',
+    amount: 450,
+    refundAmount: 450,
+    reason: 'Guest emergency travel cancellation',
+    refundMethod: 'Cash Counter Settlement',
+    status: 'Processed',
+    processedBy: 'manager',
+    createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
+  },
+];
 
-// In-memory Maintenance Configuration
-let maintenanceStatus = {
-  maintenanceSuites: 0,
-  maintenanceDormBeds: 0,
-  suiteMaintenanceReason: '',
-  dormMaintenanceReason: '',
-};
+let auditLogs = [
+  {
+    id: 'AUD-001',
+    timestamp: new Date(Date.now() - 86400000 * 3).toISOString(),
+    userId: 'USR-001',
+    username: 'admin',
+    role: 'admin',
+    action: 'SYSTEM_INITIALIZATION',
+    targetType: 'System',
+    targetId: 'W208',
+    details: 'WDPCS Accommodation Admin Portal session initialized.',
+    ip: '127.0.0.1',
+  },
+];
 
-// In-memory Notifications store for Admin
 let notifications = [
   {
     id: 'NOTIF-1',
     type: 'new_booking',
-    bookingId: 'MSR-RZP-984210',
-    title: 'New Online Booking: Anand Kumar',
-    message: 'Anand Kumar booked Suite Room for 2026-07-28 (₹2,500)',
-    amount: 2500,
-    roomType: 'Suite Room (₹2,500/night)',
-    guestName: 'Anand Kumar',
-    guestPhone: '+91 98450 12345',
-    guestEmail: 'anand.k@gmail.com',
-    checkInDate: '2026-07-28',
-    paymentMethod: 'Online Pre-payment (Razorpay)',
-    read: false,
-    createdAt: new Date('2026-07-24T09:30:00Z').toISOString(),
-  },
-  {
-    id: 'NOTIF-2',
-    type: 'new_booking',
-    bookingId: 'MSR-CTR-482910',
-    title: 'New Counter Booking: Priya Sharma',
-    message: 'Priya Sharma booked Dormitory Bed for 2026-07-29 (₹450)',
+    bookingId: 'MSR-CTR-109284',
+    title: 'New Reservation: Siddharth Nair',
+    message: 'Siddharth Nair booked Dormitory Bed for 2026-10-23 (₹450)',
     amount: 450,
     roomType: 'Dormitory Bed (₹450/night)',
-    guestName: 'Priya Sharma',
-    guestPhone: '+91 97412 67890',
-    guestEmail: 'priya.s@yahoo.com',
-    checkInDate: '2026-07-29',
+    guestName: 'Siddharth Nair',
+    guestPhone: '+91 83019 95940',
+    guestEmail: 'siddharth@gmail.com',
+    checkInDate: '2026-10-23',
     paymentMethod: 'Pay at Counter / Property',
     read: false,
-    createdAt: new Date('2026-07-24T10:15:00Z').toISOString(),
+    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
   },
 ];
 
-// Helper: Validation for booking payload
+function logAuditEvent(adminUser, action, targetType, targetId, details, req) {
+  const logEntry = {
+    id: 'AUD-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+    timestamp: new Date().toISOString(),
+    userId: adminUser?.id || 'ANONYMOUS',
+    username: adminUser?.username || 'SYSTEM',
+    role: adminUser?.role || 'SYSTEM',
+    action,
+    targetType,
+    targetId: String(targetId || 'N/A'),
+    details: typeof details === 'object' ? JSON.stringify(details) : String(details),
+    ip: req?.headers['x-forwarded-for'] || req?.socket?.remoteAddress || '127.0.0.1',
+  };
+  auditLogs.unshift(logEntry);
+  if (auditLogs.length > 500) auditLogs.pop();
+  return logEntry;
+}
+
+// Validation helper
 function validateBookingData({ name, email, phone, date, roomType }) {
   const errors = [];
-
   if (!name || typeof name !== 'string' || name.trim().length < 2) {
     errors.push('Guest name is required (minimum 2 characters).');
   }
-
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!email || typeof email !== 'string' || !emailRegex.test(email.trim())) {
     errors.push('A valid email address is required (e.g. name@example.com).');
   }
-
   const phoneDigits = (phone || '').replace(/\D/g, '');
   if (!phone || typeof phone !== 'string' || phoneDigits.length < 7) {
     errors.push('A valid contact phone number with at least 7 digits is required.');
   }
-
   if (!date || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     errors.push('A valid check-in date in YYYY-MM-DD format is required.');
-  } else {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const bookingDate = new Date(date + 'T00:00:00');
-    if (isNaN(bookingDate.getTime())) {
-      errors.push('Invalid check-in date provided.');
-    } else if (bookingDate < today) {
-      errors.push('Check-in date cannot be in the past.');
-    }
   }
-
   if (!roomType || typeof roomType !== 'string') {
     errors.push('Room type selection is required.');
   }
-
   return errors;
 }
 
-// Helper: Real-time availability check for booking
 function checkRoomAvailability(date, roomType) {
   const activeBookings = bookings.filter(
     (b) => b.status !== 'Cancelled' && b.date === date
   );
-
   const isDorm = (roomType || '').toLowerCase().includes('dormitory');
   const isSuite = (roomType || '').toLowerCase().includes('suite');
 
@@ -180,7 +443,7 @@ function checkRoomAvailability(date, roomType) {
     if (availableSuites <= 0) {
       return {
         available: false,
-        error: `Suite rooms are completely sold out or under maintenance on ${date}. Please select another date.`,
+        error: `Suite rooms are completely booked or under maintenance on ${date}. Please choose another date.`,
       };
     }
   } else if (isDorm) {
@@ -189,69 +452,26 @@ function checkRoomAvailability(date, roomType) {
     if (availableDormBeds <= 0) {
       return {
         available: false,
-        error: `Dormitory beds are completely sold out or under maintenance on ${date}. Please select another date.`,
+        error: `Dormitory beds are completely booked or under maintenance on ${date}. Please choose another date.`,
       };
     }
   }
-
   return { available: true };
 }
 
-// GET current room prices
-app.get('/api/prices', (req, res) => {
-  res.json(roomPrices);
-});
+// ==========================================
+// 4. PUBLIC GUEST API ENDPOINTS (rooms.wdpcs.in)
+// ==========================================
 
-// POST update room prices (Admin)
-app.post('/api/admin/prices', (req, res) => {
-  const { suitePrice, dormPrice } = req.body;
-  if (suitePrice !== undefined && !isNaN(Number(suitePrice))) {
-    roomPrices.suitePrice = Number(suitePrice);
-  }
-  if (dormPrice !== undefined && !isNaN(Number(dormPrice))) {
-    roomPrices.dormPrice = Number(dormPrice);
-  }
-  res.json({ success: true, roomPrices });
-});
-
-// GET current maintenance status
-app.get('/api/admin/maintenance', (req, res) => {
-  res.json(maintenanceStatus);
-});
-
-// POST update maintenance status (Admin)
-app.post('/api/admin/maintenance', (req, res) => {
-  const { maintenanceSuites, maintenanceDormBeds, suiteMaintenanceReason, dormMaintenanceReason } = req.body;
-  if (maintenanceSuites !== undefined) {
-    maintenanceStatus.maintenanceSuites = Math.min(TOTAL_SUITES, Math.max(0, Number(maintenanceSuites)));
-  }
-  if (maintenanceDormBeds !== undefined) {
-    maintenanceStatus.maintenanceDormBeds = Math.min(TOTAL_DORM_BEDS, Math.max(0, Number(maintenanceDormBeds)));
-  }
-  if (suiteMaintenanceReason !== undefined) {
-    maintenanceStatus.suiteMaintenanceReason = String(suiteMaintenanceReason);
-  }
-  if (dormMaintenanceReason !== undefined) {
-    maintenanceStatus.dormMaintenanceReason = String(dormMaintenanceReason);
-  }
-  res.json({ success: true, maintenanceStatus });
-});
-
-// GET availability for a given date or overall
+// Public availability endpoint
 app.get('/api/availability', (req, res) => {
   const { date } = req.query;
-
   const activeBookings = bookings.filter(
     (b) => b.status !== 'Cancelled' && (!date || b.date === date)
   );
 
-  const bookedSuites = activeBookings.filter((b) =>
-    b.roomType.includes('Suite')
-  ).length;
-
-  const bookedDormBeds = activeBookings.filter((b) =>
-    b.roomType.includes('Dormitory')
-  ).length;
+  const bookedSuites = activeBookings.filter((b) => b.roomType.includes('Suite')).length;
+  const bookedDormBeds = activeBookings.filter((b) => b.roomType.includes('Dormitory')).length;
 
   const availableSuites = Math.max(0, TOTAL_SUITES - bookedSuites - maintenanceStatus.maintenanceSuites);
   const availableDormBeds = Math.max(0, TOTAL_DORM_BEDS - bookedDormBeds - maintenanceStatus.maintenanceDormBeds);
@@ -259,148 +479,38 @@ app.get('/api/availability', (req, res) => {
   res.json({
     date: date || null,
     totalSuites: TOTAL_SUITES,
-    bookedSuites,
-    maintenanceSuites: maintenanceStatus.maintenanceSuites,
     availableSuites,
+    maintenanceSuites: maintenanceStatus.maintenanceSuites,
     totalDormBeds: TOTAL_DORM_BEDS,
-    bookedDormBeds,
-    maintenanceDormBeds: maintenanceStatus.maintenanceDormBeds,
     availableDormBeds,
+    maintenanceDormBeds: maintenanceStatus.maintenanceDormBeds,
     roomPrices,
-    maintenanceStatus,
   });
 });
 
-// Admin Login endpoint
-app.post('/api/admin/login', (req, res) => {
-  const { username, password } = req.body;
-  if (username === 'admin' && (password === 'admin' || password === 'admin123')) {
-    return res.json({ success: true, token: 'msr_admin_session_token' });
-  }
-  return res.status(401).json({ success: false, error: 'Invalid username or password' });
+// Public prices endpoint
+app.get('/api/prices', (req, res) => {
+  res.json(roomPrices);
 });
 
-// GET all bookings
-app.get('/api/bookings', (req, res) => {
-  res.json(bookings);
-});
-
-// Create order for Razorpay
-app.post('/create-order', async (req, res) => {
-  try {
-    const options = {
-      amount: req.body.amount * 100,
-      currency: 'INR',
-      receipt: 'receipt_order',
-    };
-
-    const order = await razorpay.orders.create(options);
-    res.json(order);
-  } catch (error) {
-    res.status(500).send(error);
-  }
-});
-
-// Save online booking completion
-app.post('/api/confirm-online-booking', (req, res) => {
-  try {
-    const { id, name, email, phone, date, roomType, amount, paymentMethod } = req.body;
-
-    // 1. Field-level validation
-    const validationErrors = validateBookingData({ name, email, phone, date, roomType });
-    if (validationErrors.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: validationErrors[0],
-        errors: validationErrors,
-      });
-    }
-
-    // 2. Room availability validation
-    const availCheck = checkRoomAvailability(date, roomType);
-    if (!availCheck.available) {
-      return res.status(400).json({
-        success: false,
-        error: availCheck.error,
-      });
-    }
-
-    const calculatedAmount = Number(amount) || (roomType && roomType.includes('Dormitory') ? roomPrices.dormPrice : roomPrices.suitePrice);
-    const bookingId = id || ('MSR-RZP-' + Math.floor(100000 + Math.random() * 900000));
-
-    const newBooking = {
-      id: bookingId,
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      phone: phone ? phone.trim() : '',
-      date,
-      roomType: roomType || 'Suite Room (₹2,500/night)',
-      amount: calculatedAmount,
-      paymentMethod: paymentMethod || 'Online Pre-payment (Razorpay)',
-      status: 'Paid Online',
-      createdAt: new Date().toISOString(),
-    };
-    bookings.unshift(newBooking);
-
-    // 3. Create Admin Notification
-    const notif = {
-      id: 'NOTIF-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
-      type: 'new_booking',
-      bookingId: newBooking.id,
-      title: `Online Payment Confirmed: ${newBooking.name}`,
-      message: `${newBooking.name} booked ${newBooking.roomType} for ${newBooking.date} (₹${newBooking.amount.toLocaleString('en-IN')})`,
-      amount: newBooking.amount,
-      roomType: newBooking.roomType,
-      guestName: newBooking.name,
-      guestPhone: newBooking.phone,
-      guestEmail: newBooking.email,
-      checkInDate: newBooking.date,
-      paymentMethod: newBooking.paymentMethod,
-      read: false,
-      createdAt: new Date().toISOString(),
-    };
-    notifications.unshift(notif);
-    console.log(`🔔 [ADMIN NOTIFICATION] Online Booking Received: ${newBooking.id} | ${newBooking.name} | ${newBooking.date} | ₹${newBooking.amount}`);
-
-    res.status(201).json({
-      success: true,
-      bookingId: newBooking.id,
-      message: 'Online booking confirmed successfully!',
-      booking: newBooking,
-      details: newBooking,
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// Save counter booking
+// Public Counter booking reservation
 app.post('/book-counter', (req, res) => {
   try {
     const { name, email, phone, date, roomType } = req.body;
 
-    // 1. Field-level validation
     const validationErrors = validateBookingData({ name, email, phone, date, roomType });
     if (validationErrors.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: validationErrors[0],
-        errors: validationErrors,
-      });
+      return res.status(400).json({ success: false, error: validationErrors[0], errors: validationErrors });
     }
 
-    // 2. Room availability validation
     const availCheck = checkRoomAvailability(date, roomType);
     if (!availCheck.available) {
-      return res.status(400).json({
-        success: false,
-        error: availCheck.error,
-      });
+      return res.status(400).json({ success: false, error: availCheck.error });
     }
 
     const bookingId = 'MSR-CTR-' + Math.floor(100000 + Math.random() * 900000);
     const amount = roomType && roomType.includes('Dormitory') ? roomPrices.dormPrice : roomPrices.suitePrice;
-    
+
     const newBooking = {
       id: bookingId,
       name: name.trim(),
@@ -416,13 +526,13 @@ app.post('/book-counter', (req, res) => {
 
     bookings.unshift(newBooking);
 
-    // 3. Create Admin Notification
+    // Create Admin Notification
     const notif = {
-      id: 'NOTIF-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+      id: 'NOTIF-' + Date.now(),
       type: 'new_booking',
       bookingId: newBooking.id,
-      title: `New Counter Reservation: ${newBooking.name}`,
-      message: `${newBooking.name} booked ${newBooking.roomType} for ${newBooking.date} (Pay on Arrival: ₹${newBooking.amount.toLocaleString('en-IN')})`,
+      title: `New Reservation: ${newBooking.name}`,
+      message: `${newBooking.name} reserved ${newBooking.roomType} for ${newBooking.date} (₹${newBooking.amount.toLocaleString('en-IN')})`,
       amount: newBooking.amount,
       roomType: newBooking.roomType,
       guestName: newBooking.name,
@@ -434,7 +544,6 @@ app.post('/book-counter', (req, res) => {
       createdAt: new Date().toISOString(),
     };
     notifications.unshift(notif);
-    console.log(`🔔 [ADMIN NOTIFICATION] Counter Booking Received: ${newBooking.id} | ${newBooking.name} (${newBooking.phone}) | ${newBooking.date} | ₹${newBooking.amount}`);
 
     res.status(201).json({
       success: true,
@@ -447,8 +556,628 @@ app.post('/book-counter', (req, res) => {
   }
 });
 
-// GET all admin notifications & unread count
-app.get('/api/admin/notifications', (req, res) => {
+// Razorpay Order creation (Key Secret is NEVER returned)
+app.post('/create-order', async (req, res) => {
+  try {
+    const { amount } = req.body;
+    if (!amount || isNaN(Number(amount))) {
+      return res.status(400).json({ error: 'Valid amount is required.' });
+    }
+
+    const options = {
+      amount: Math.round(Number(amount) * 100), // in paise
+      currency: 'INR',
+      receipt: 'rcpt_' + Date.now().toString().slice(-6),
+    };
+
+    const order = await razorpay.orders.create(options);
+    res.json({
+      id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_dummy',
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message || 'Razorpay order creation failed.' });
+  }
+});
+
+// Confirm online payment
+app.post('/api/confirm-online-booking', (req, res) => {
+  try {
+    const { id, name, email, phone, date, roomType, amount, paymentId, orderId } = req.body;
+
+    const validationErrors = validateBookingData({ name, email, phone, date, roomType });
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ success: false, error: validationErrors[0] });
+    }
+
+    const availCheck = checkRoomAvailability(date, roomType);
+    if (!availCheck.available) {
+      return res.status(400).json({ success: false, error: availCheck.error });
+    }
+
+    const bookingId = id || ('MSR-RZP-' + Math.floor(100000 + Math.random() * 900000));
+    const calculatedAmount = Number(amount) || (roomType.includes('Dormitory') ? roomPrices.dormPrice : roomPrices.suitePrice);
+
+    const newBooking = {
+      id: bookingId,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone ? phone.trim() : '',
+      date,
+      roomType,
+      amount: calculatedAmount,
+      paymentMethod: 'Online Pre-payment (Razorpay)',
+      status: 'Paid Online',
+      createdAt: new Date().toISOString(),
+    };
+
+    bookings.unshift(newBooking);
+
+    // Record Transaction
+    transactions.unshift({
+      id: 'TXN-' + Date.now(),
+      orderId: orderId || 'order_direct',
+      paymentId: paymentId || 'pay_online_auto',
+      bookingId,
+      guestName: newBooking.name,
+      amount: calculatedAmount,
+      paymentMethod: 'Razorpay Online',
+      status: 'Captured',
+      createdAt: new Date().toISOString(),
+    });
+
+    // Notify Admin
+    notifications.unshift({
+      id: 'NOTIF-' + Date.now(),
+      type: 'new_booking',
+      bookingId: newBooking.id,
+      title: `Online Payment Confirmed: ${newBooking.name}`,
+      message: `${newBooking.name} paid ₹${calculatedAmount.toLocaleString('en-IN')} for ${newBooking.roomType}`,
+      amount: calculatedAmount,
+      roomType: newBooking.roomType,
+      guestName: newBooking.name,
+      guestPhone: newBooking.phone,
+      guestEmail: newBooking.email,
+      checkInDate: newBooking.date,
+      paymentMethod: newBooking.paymentMethod,
+      read: false,
+      createdAt: new Date().toISOString(),
+    });
+
+    res.status(201).json({
+      success: true,
+      bookingId: newBooking.id,
+      message: 'Online booking confirmed successfully!',
+      booking: newBooking,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ==========================================
+// 5. ADMINISTRATIVE API (roomsadmin.wdpcs.in)
+// ==========================================
+
+// Staff Login
+app.post('/api/admin/login', (req, res) => {
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
+  const rateCheck = checkRateLimit(ip);
+  if (!rateCheck.allowed) {
+    return res.status(429).json({ success: false, error: rateCheck.error });
+  }
+
+  const { username, password } = req.body;
+  if (!username || !password) {
+    return res.status(400).json({ success: false, error: 'Username and password are required.' });
+  }
+
+  const user = staffUsers.find(
+    (u) => u.username.toLowerCase() === username.trim().toLowerCase() && u.active
+  );
+
+  const givenHash = hashPassword(password);
+  if (user && user.passwordHash === givenHash) {
+    registerSuccessfulLogin(ip);
+
+    const tokenPayload = {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      role: user.role,
+      email: user.email,
+    };
+
+    const token = generateToken(tokenPayload);
+
+    logAuditEvent(user, 'STAFF_LOGIN', 'Auth', user.id, `User ${user.username} (${user.role}) logged in successfully.`, req);
+
+    return res.json({
+      success: true,
+      token,
+      user: tokenPayload,
+    });
+  }
+
+  registerFailedLogin(ip);
+  return res.status(401).json({
+    success: false,
+    error: 'Invalid staff credentials. Please check your username and password.',
+  });
+});
+
+// Staff Session Verification
+app.get('/api/admin/me', requireAuth(), (req, res) => {
+  res.json({
+    success: true,
+    user: req.adminUser,
+    society: societySettings,
+  });
+});
+
+// Staff Logout
+app.post('/api/admin/logout', requireAuth(), (req, res) => {
+  logAuditEvent(req.adminUser, 'STAFF_LOGOUT', 'Auth', req.adminUser.id, 'Session terminated.', req);
+  res.json({ success: true, message: 'Logged out successfully.' });
+});
+
+// Dashboard Overview KPIs
+app.get('/api/admin/dashboard/stats', requireAuth(), (req, res) => {
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const todayCheckIns = bookings.filter((b) => b.date === todayStr && b.status !== 'Cancelled');
+  const todayCheckOuts = bookings.filter((b) => b.status === 'Checked In'); // In-house ready for checkout
+
+  const activeBookings = bookings.filter((b) => b.status !== 'Cancelled');
+  const occupiedSuites = activeBookings.filter((b) => b.roomType.includes('Suite') && (b.status === 'Checked In' || b.date === todayStr)).length;
+  const occupiedDormBeds = activeBookings.filter((b) => b.roomType.includes('Dormitory') && (b.status === 'Checked In' || b.date === todayStr)).length;
+
+  const totalCapacity = TOTAL_SUITES + TOTAL_DORM_BEDS;
+  const totalOccupied = occupiedSuites + occupiedDormBeds;
+  const occupancyPercentage = Math.round((totalOccupied / totalCapacity) * 100);
+
+  const availableSuites = Math.max(0, TOTAL_SUITES - occupiedSuites - maintenanceStatus.maintenanceSuites);
+  const availableDormBeds = Math.max(0, TOTAL_DORM_BEDS - occupiedDormBeds - maintenanceStatus.maintenanceDormBeds);
+
+  const pendingBookings = bookings.filter((b) => b.status.includes('Pending')).length;
+  const confirmedBookings = bookings.filter((b) => b.status === 'Paid Online' || b.status === 'Paid at Counter' || b.status === 'Checked In').length;
+
+  const totalRevenue = bookings.filter((b) => b.status !== 'Cancelled').reduce((sum, b) => sum + (b.amount || 0), 0);
+  const onlineRevenue = bookings.filter((b) => b.status === 'Paid Online').reduce((sum, b) => sum + (b.amount || 0), 0);
+  const counterRevenue = bookings.filter((b) => b.status === 'Paid at Counter').reduce((sum, b) => sum + (b.amount || 0), 0);
+
+  res.json({
+    todayDate: todayStr,
+    todayCheckInsCount: todayCheckIns.length,
+    todayCheckIns,
+    todayCheckOutsCount: todayCheckOuts.length,
+    todayCheckOuts,
+    occupancyPercentage,
+    totalOccupied,
+    totalCapacity,
+    availableSuites,
+    totalSuites: TOTAL_SUITES,
+    maintenanceSuites: maintenanceStatus.maintenanceSuites,
+    availableDormBeds,
+    totalDormBeds: TOTAL_DORM_BEDS,
+    maintenanceDormBeds: maintenanceStatus.maintenanceDormBeds,
+    pendingBookings,
+    confirmedBookings,
+    totalBookings: bookings.length,
+    revenue: {
+      total: totalRevenue,
+      online: onlineRevenue,
+      counter: counterRevenue,
+    },
+    roomPrices,
+  });
+});
+
+// Bookings List with Filters
+app.get('/api/admin/bookings', requireAuth(), (req, res) => {
+  const { search, status, roomType, date } = req.query;
+  let result = [...bookings];
+
+  if (search) {
+    const s = search.toLowerCase();
+    result = result.filter(
+      (b) =>
+        b.id.toLowerCase().includes(s) ||
+        b.name.toLowerCase().includes(s) ||
+        b.email.toLowerCase().includes(s) ||
+        (b.phone && b.phone.toLowerCase().includes(s))
+    );
+  }
+
+  if (status && status !== 'All') {
+    result = result.filter((b) => b.status === status);
+  }
+
+  if (roomType && roomType !== 'All') {
+    result = result.filter((b) => b.roomType.toLowerCase().includes(roomType.toLowerCase()));
+  }
+
+  if (date) {
+    result = result.filter((b) => b.date === date);
+  }
+
+  res.json({ success: true, count: result.length, bookings: result });
+});
+
+// Manual Front Desk Walk-In Booking
+app.post('/api/admin/bookings/walkin', requireAuth(['admin', 'manager', 'receptionist']), (req, res) => {
+  const { name, email, phone, date, roomType, amount, paymentMethod, status, notes } = req.body;
+
+  const validationErrors = validateBookingData({ name, email, phone, date, roomType });
+  if (validationErrors.length > 0) {
+    return res.status(400).json({ success: false, error: validationErrors[0] });
+  }
+
+  const bookingId = 'MSR-CTR-' + Math.floor(100000 + Math.random() * 900000);
+  const calculatedAmount = Number(amount) || (roomType.includes('Dormitory') ? roomPrices.dormPrice : roomPrices.suitePrice);
+
+  const newBooking = {
+    id: bookingId,
+    name: name.trim(),
+    email: email.trim().toLowerCase(),
+    phone: phone ? phone.trim() : '',
+    date,
+    roomType,
+    amount: calculatedAmount,
+    paymentMethod: paymentMethod || 'Cash at Counter',
+    status: status || 'Paid at Counter',
+    notes: notes || 'Front Desk Walk-in',
+    createdBy: req.adminUser.username,
+    createdAt: new Date().toISOString(),
+  };
+
+  bookings.unshift(newBooking);
+
+  // If marked paid, create transaction record
+  if (newBooking.status === 'Paid at Counter' || newBooking.status === 'Checked In') {
+    transactions.unshift({
+      id: 'TXN-' + Date.now(),
+      orderId: 'counter_reception',
+      paymentId: 'CASH_' + bookingId,
+      bookingId,
+      guestName: newBooking.name,
+      amount: calculatedAmount,
+      paymentMethod: newBooking.paymentMethod,
+      status: 'Captured',
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  logAuditEvent(req.adminUser, 'CREATE_WALKIN_BOOKING', 'Booking', bookingId, `Created walk-in booking for ${newBooking.name} (₹${calculatedAmount})`, req);
+
+  res.status(201).json({ success: true, booking: newBooking });
+});
+
+// Update Booking Status
+app.patch('/api/admin/bookings/:id', requireAuth(), (req, res) => {
+  const { id } = req.params;
+  const { status, notes } = req.body;
+  const booking = bookings.find((b) => b.id === id);
+
+  if (!booking) {
+    return res.status(404).json({ success: false, error: 'Booking not found.' });
+  }
+
+  const oldStatus = booking.status;
+  if (status) booking.status = status;
+  if (notes !== undefined) booking.notes = notes;
+
+  logAuditEvent(req.adminUser, 'UPDATE_BOOKING_STATUS', 'Booking', id, `Changed status from '${oldStatus}' to '${status}'.`, req);
+
+  res.json({ success: true, booking });
+});
+
+// Delete Booking (Admin & Manager only)
+app.delete('/api/admin/bookings/:id', requireAuth(['admin', 'manager']), (req, res) => {
+  const { id } = req.params;
+  const initialLength = bookings.length;
+  bookings = bookings.filter((b) => b.id !== id);
+
+  if (bookings.length === initialLength) {
+    return res.status(404).json({ success: false, error: 'Booking not found.' });
+  }
+
+  logAuditEvent(req.adminUser, 'DELETE_BOOKING', 'Booking', id, `Removed booking ${id}.`, req);
+  res.json({ success: true, message: 'Booking removed from records.' });
+});
+
+// Inventory Status & Maintenance Controls
+app.get('/api/admin/inventory', requireAuth(), (req, res) => {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const activeBookings = bookings.filter((b) => b.date === todayStr && b.status !== 'Cancelled');
+
+  const suiteList = Array.from({ length: TOTAL_SUITES }, (_, i) => {
+    const suiteNo = i + 1;
+    const isUnderMaint = suiteNo <= maintenanceStatus.maintenanceSuites;
+    const booked = activeBookings.filter((b) => b.roomType.includes('Suite'))[i];
+    return {
+      id: `SUITE-${suiteNo}`,
+      number: `Suite 10${suiteNo}`,
+      type: 'Suite Room',
+      rate: roomPrices.suitePrice,
+      status: isUnderMaint ? 'Maintenance' : booked ? (booked.status === 'Checked In' ? 'Occupied' : 'Reserved') : 'Available',
+      currentGuest: booked ? { id: booked.id, name: booked.name, phone: booked.phone } : null,
+      maintenanceReason: isUnderMaint ? maintenanceStatus.suiteMaintenanceReason : null,
+    };
+  });
+
+  const dormList = Array.from({ length: TOTAL_DORM_BEDS }, (_, i) => {
+    const bedNo = i + 1;
+    const isUnderMaint = bedNo <= maintenanceStatus.maintenanceDormBeds;
+    const booked = activeBookings.filter((b) => b.roomType.includes('Dormitory'))[i];
+    return {
+      id: `DORM-${bedNo}`,
+      number: `Bed D-${bedNo < 10 ? '0' + bedNo : bedNo}`,
+      type: 'Dormitory Bed',
+      rate: roomPrices.dormPrice,
+      status: isUnderMaint ? 'Maintenance' : booked ? (booked.status === 'Checked In' ? 'Occupied' : 'Reserved') : 'Available',
+      currentGuest: booked ? { id: booked.id, name: booked.name, phone: booked.phone } : null,
+      maintenanceReason: isUnderMaint ? maintenanceStatus.dormMaintenanceReason : null,
+    };
+  });
+
+  res.json({
+    totalSuites: TOTAL_SUITES,
+    totalDormBeds: TOTAL_DORM_BEDS,
+    suiteList,
+    dormList,
+    maintenanceStatus,
+    roomPrices,
+  });
+});
+
+// Update Maintenance Controls
+app.post('/api/admin/maintenance', requireAuth(['admin', 'manager']), (req, res) => {
+  const { maintenanceSuites, maintenanceDormBeds, suiteMaintenanceReason, dormMaintenanceReason } = req.body;
+
+  if (maintenanceSuites !== undefined) {
+    maintenanceStatus.maintenanceSuites = Math.min(TOTAL_SUITES, Math.max(0, Number(maintenanceSuites)));
+  }
+  if (maintenanceDormBeds !== undefined) {
+    maintenanceStatus.maintenanceDormBeds = Math.min(TOTAL_DORM_BEDS, Math.max(0, Number(maintenanceDormBeds)));
+  }
+  if (suiteMaintenanceReason !== undefined) {
+    maintenanceStatus.suiteMaintenanceReason = String(suiteMaintenanceReason);
+  }
+  if (dormMaintenanceReason !== undefined) {
+    maintenanceStatus.dormMaintenanceReason = String(dormMaintenanceReason);
+  }
+  maintenanceStatus.updatedAt = new Date().toISOString();
+
+  logAuditEvent(req.adminUser, 'UPDATE_MAINTENANCE', 'Inventory', 'MAINT', maintenanceStatus, req);
+  res.json({ success: true, maintenanceStatus });
+});
+
+app.get('/api/admin/maintenance', requireAuth(), (req, res) => {
+  res.json(maintenanceStatus);
+});
+
+// Update Room Prices
+app.post('/api/admin/prices', requireAuth(['admin', 'manager']), (req, res) => {
+  const { suitePrice, dormPrice } = req.body;
+  const oldPrices = { ...roomPrices };
+
+  if (suitePrice !== undefined && !isNaN(Number(suitePrice))) {
+    roomPrices.suitePrice = Number(suitePrice);
+  }
+  if (dormPrice !== undefined && !isNaN(Number(dormPrice))) {
+    roomPrices.dormPrice = Number(dormPrice);
+  }
+
+  logAuditEvent(req.adminUser, 'UPDATE_PRICES', 'Pricing', 'RATES', { oldPrices, newPrices: roomPrices }, req);
+  res.json({ success: true, roomPrices });
+});
+
+// Availability Calendar View (Next 30 days)
+app.get('/api/admin/calendar', requireAuth(), (req, res) => {
+  const { days = 30 } = req.query;
+  const calendarData = [];
+  const today = new Date();
+
+  for (let i = 0; i < Number(days); i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    const dateStr = d.toISOString().split('T')[0];
+
+    const dayBookings = bookings.filter((b) => b.date === dateStr && b.status !== 'Cancelled');
+    const suitesBooked = dayBookings.filter((b) => b.roomType.includes('Suite')).length;
+    const dormBooked = dayBookings.filter((b) => b.roomType.includes('Dormitory')).length;
+
+    const suitesAvailable = Math.max(0, TOTAL_SUITES - suitesBooked - maintenanceStatus.maintenanceSuites);
+    const dormAvailable = Math.max(0, TOTAL_DORM_BEDS - dormBooked - maintenanceStatus.maintenanceDormBeds);
+
+    calendarData.push({
+      date: dateStr,
+      dayName: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      suitesBooked,
+      suitesAvailable,
+      totalSuites: TOTAL_SUITES,
+      dormBooked,
+      dormAvailable,
+      totalDormBeds: TOTAL_DORM_BEDS,
+      hasMaintenance: maintenanceStatus.maintenanceSuites > 0 || maintenanceStatus.maintenanceDormBeds > 0,
+      bookings: dayBookings.map((b) => ({ id: b.id, name: b.name, roomType: b.roomType, status: b.status })),
+    });
+  }
+
+  res.json({ success: true, days: calendarData.length, calendar: calendarData });
+});
+
+// Guest Directory CRM
+app.get('/api/admin/guests', requireAuth(), (req, res) => {
+  const guestMap = new Map();
+
+  bookings.forEach((b) => {
+    const key = b.email || b.phone || b.name;
+    if (!guestMap.has(key)) {
+      guestMap.set(key, {
+        name: b.name,
+        email: b.email,
+        phone: b.phone,
+        totalBookings: 0,
+        totalSpent: 0,
+        lastVisit: b.date,
+        history: [],
+      });
+    }
+
+    const g = guestMap.get(key);
+    g.totalBookings += 1;
+    if (b.status !== 'Cancelled') {
+      g.totalSpent += b.amount || 0;
+    }
+    g.history.push({
+      id: b.id,
+      date: b.date,
+      roomType: b.roomType,
+      amount: b.amount,
+      status: b.status,
+    });
+  });
+
+  const guestList = Array.from(guestMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+  res.json({ success: true, count: guestList.length, guests: guestList });
+});
+
+// Transactions & Razorpay Monitoring
+app.get('/api/admin/transactions', requireAuth(), (req, res) => {
+  res.json({ success: true, count: transactions.length, transactions });
+});
+
+// Cancellations & Refunds Management
+app.get('/api/admin/refunds', requireAuth(), (req, res) => {
+  res.json({ success: true, refunds });
+});
+
+app.post('/api/admin/refunds', requireAuth(['admin', 'manager']), (req, res) => {
+  const { bookingId, refundAmount, reason, refundMethod } = req.body;
+  const booking = bookings.find((b) => b.id === bookingId);
+
+  if (!booking) {
+    return res.status(404).json({ success: false, error: 'Booking not found.' });
+  }
+
+  booking.status = 'Cancelled';
+
+  const refundEntry = {
+    id: 'REF-' + Date.now().toString().slice(-6),
+    bookingId,
+    guestName: booking.name,
+    amount: booking.amount,
+    refundAmount: Number(refundAmount) || booking.amount,
+    reason: reason || 'Customer requested cancellation',
+    refundMethod: refundMethod || 'Cash Counter Settlement',
+    status: 'Processed',
+    processedBy: req.adminUser.username,
+    createdAt: new Date().toISOString(),
+  };
+
+  refunds.unshift(refundEntry);
+  logAuditEvent(req.adminUser, 'PROCESS_REFUND', 'Refund', refundEntry.id, refundEntry, req);
+
+  res.status(201).json({ success: true, refund: refundEntry });
+});
+
+// Reports & Analytics
+app.get('/api/admin/reports', requireAuth(), (req, res) => {
+  const totalBookings = bookings.length;
+  const activeBookings = bookings.filter((b) => b.status !== 'Cancelled');
+  const cancelledBookings = bookings.filter((b) => b.status === 'Cancelled');
+  const totalRevenue = activeBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
+
+  // Group by room type
+  const suiteBookings = activeBookings.filter((b) => b.roomType.includes('Suite'));
+  const dormBookings = activeBookings.filter((b) => b.roomType.includes('Dormitory'));
+
+  const suiteRevenue = suiteBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
+  const dormRevenue = dormBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
+
+  // Group by payment method
+  const onlineBookings = activeBookings.filter((b) => b.paymentMethod.includes('Online'));
+  const counterBookings = activeBookings.filter((b) => b.paymentMethod.includes('Counter'));
+
+  res.json({
+    generatedAt: new Date().toISOString(),
+    summary: {
+      totalBookings,
+      activeBookings: activeBookings.length,
+      cancelledBookings: cancelledBookings.length,
+      totalRevenue,
+      averageBookingValue: activeBookings.length ? Math.round(totalRevenue / activeBookings.length) : 0,
+    },
+    byRoom: {
+      suites: { count: suiteBookings.length, revenue: suiteRevenue },
+      dormitory: { count: dormBookings.length, revenue: dormRevenue },
+    },
+    byPayment: {
+      online: { count: onlineBookings.length, revenue: onlineBookings.reduce((s, b) => s + (b.amount || 0), 0) },
+      counter: { count: counterBookings.length, revenue: counterBookings.reduce((s, b) => s + (b.amount || 0), 0) },
+    },
+    bookingsRoster: bookings,
+  });
+});
+
+// User & Role Management (Super Admin only)
+app.get('/api/admin/users', requireAuth(['admin']), (req, res) => {
+  const sanitizedUsers = staffUsers.map(({ passwordHash, ...rest }) => rest);
+  res.json({ success: true, users: sanitizedUsers });
+});
+
+app.post('/api/admin/users', requireAuth(['admin']), (req, res) => {
+  const { username, name, role, password, email, phone } = req.body;
+  if (!username || !password || !role) {
+    return res.status(400).json({ success: false, error: 'Username, password, and role are required.' });
+  }
+
+  const existing = staffUsers.find((u) => u.username.toLowerCase() === username.trim().toLowerCase());
+  if (existing) {
+    return res.status(400).json({ success: false, error: 'Username already in use.' });
+  }
+
+  const newUser = {
+    id: 'USR-' + (staffUsers.length + 1).toString().padStart(3, '0'),
+    username: username.trim().toLowerCase(),
+    name: name || username,
+    role: role || 'receptionist',
+    passwordHash: hashPassword(password),
+    email: email || `${username}@wdpcs.in`,
+    phone: phone || '',
+    active: true,
+    createdAt: new Date().toISOString(),
+  };
+
+  staffUsers.push(newUser);
+  logAuditEvent(req.adminUser, 'CREATE_USER', 'User', newUser.id, `Created staff user ${newUser.username} with role ${newUser.role}`, req);
+
+  const { passwordHash, ...sanitized } = newUser;
+  res.status(201).json({ success: true, user: sanitized });
+});
+
+// Audit Logs
+app.get('/api/admin/audit-logs', requireAuth(), (req, res) => {
+  res.json({ success: true, count: auditLogs.length, auditLogs });
+});
+
+// System Settings
+app.get('/api/admin/settings', requireAuth(), (req, res) => {
+  res.json({ success: true, settings: societySettings });
+});
+
+app.post('/api/admin/settings', requireAuth(['admin']), (req, res) => {
+  societySettings = { ...societySettings, ...req.body };
+  logAuditEvent(req.adminUser, 'UPDATE_SETTINGS', 'Settings', 'GLOBAL', societySettings, req);
+  res.json({ success: true, settings: societySettings });
+});
+
+// Admin Notifications
+app.get('/api/admin/notifications', requireAuth(), (req, res) => {
   const unreadCount = notifications.filter((n) => !n.read).length;
   res.json({
     success: true,
@@ -458,8 +1187,7 @@ app.get('/api/admin/notifications', (req, res) => {
   });
 });
 
-// PATCH mark notification as read
-app.patch('/api/admin/notifications/:id/read', (req, res) => {
+app.patch('/api/admin/notifications/:id/read', requireAuth(), (req, res) => {
   const { id } = req.params;
   const notif = notifications.find((n) => n.id === id);
   if (notif) {
@@ -470,16 +1198,14 @@ app.patch('/api/admin/notifications/:id/read', (req, res) => {
   res.status(404).json({ success: false, error: 'Notification not found' });
 });
 
-// POST mark all notifications as read
-app.post('/api/admin/notifications/mark-all-read', (req, res) => {
+app.post('/api/admin/notifications/mark-all-read', requireAuth(), (req, res) => {
   notifications.forEach((n) => {
     n.read = true;
   });
   res.json({ success: true, unreadCount: 0 });
 });
 
-// DELETE single notification
-app.delete('/api/admin/notifications/:id', (req, res) => {
+app.delete('/api/admin/notifications/:id', requireAuth(), (req, res) => {
   const { id } = req.params;
   const initialLength = notifications.length;
   notifications = notifications.filter((n) => n.id !== id);
@@ -490,37 +1216,25 @@ app.delete('/api/admin/notifications/:id', (req, res) => {
   res.json({ success: true, message: 'Notification removed', unreadCount });
 });
 
-// PATCH update booking status
-app.patch('/api/bookings/:id', (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
-  const booking = bookings.find((b) => b.id === id);
-
-  if (!booking) {
-    return res.status(404).json({ error: 'Booking not found' });
-  }
-
-  if (status) {
-    booking.status = status;
-  }
-
-  res.json({ success: true, booking });
+// Public health check
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'online',
+    timestamp: new Date().toISOString(),
+    service: 'WDPCS Accommodation Unified API',
+    domains: {
+      guest: 'https://rooms.wdpcs.in',
+      admin: 'https://roomsadmin.wdpcs.in',
+    },
+  });
 });
 
-// DELETE booking
-app.delete('/api/bookings/:id', (req, res) => {
-  const { id } = req.params;
-  const decodedId = decodeURIComponent(id);
-  const initialLength = bookings.length;
-  bookings = bookings.filter((b) => b.id !== id && b.id !== decodedId);
-
-  if (bookings.length === initialLength) {
-    return res.status(404).json({ error: 'Booking not found' });
-  }
-
-  res.json({ success: true, message: 'Booking deleted' });
-});
-
-app.listen(5000, () => {
-  console.log('Server running on port 5000');
+// Start Server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`=======================================================`);
+  console.log(`🛡️  WDPCS Accommodation API Server running on port ${PORT}`);
+  console.log(`   Guest Domain:  https://rooms.wdpcs.in`);
+  console.log(`   Admin Domain:  https://roomsadmin.wdpcs.in`);
+  console.log(`=======================================================`);
 });
