@@ -20,10 +20,25 @@ const app = express();
 
 const JWT_SECRET = process.env.SESSION_SECRET || 'wdpcs_admin_super_secret_jwt_key_2026_w208_retreat';
 
-// Whitelist only approved origins
+// Private Network Access (PNA) support for Chrome when calling localhost from public domains
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Access-Control-Request-Private-Network');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    return res.sendStatus(204);
+  }
+  next();
+});
+
+// Whitelist approved origins (both HTTP and HTTPS)
 const allowedOrigins = [
   'https://rooms.wdpcs.in',
+  'http://rooms.wdpcs.in',
   'https://roomsadmin.wdpcs.in',
+  'http://roomsadmin.wdpcs.in',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://localhost:5000',
@@ -35,9 +50,14 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps, curl, or Postman in dev)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      const isAllowed =
+        allowedOrigins.indexOf(origin) !== -1 ||
+        /^https?:\/\/(.*\.)?wdpcs\.in(:\d+)?$/.test(origin) ||
+        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
+        process.env.NODE_ENV !== 'production';
+
+      if (isAllowed) {
         return callback(null, true);
       }
       return callback(new Error('CORS policy: Access denied for this origin.'));
