@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function PaymentMonitor({ token }) {
@@ -7,7 +7,7 @@ export default function PaymentMonitor({ token }) {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
 
-  const fetchTransactions = async () => {
+  const fetchTransactions = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/transactions`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -21,11 +21,11 @@ export default function PaymentMonitor({ token }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchTransactions();
-  }, [token]);
+  }, [fetchTransactions]);
 
   const filtered = useMemo(() => {
     return transactions.filter((t) => {

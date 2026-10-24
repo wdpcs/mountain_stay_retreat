@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL, SOCIETY_INFO } from '../config';
 
 export default function ReportsExports({ token }) {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/reports`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -19,11 +19,11 @@ export default function ReportsExports({ token }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchReports();
-  }, [token]);
+  }, [fetchReports]);
 
   const handleExportCSV = () => {
     if (!report || !report.bookingsRoster) return;

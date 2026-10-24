@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function AvailabilityCalendar({ token }) {
@@ -6,7 +6,7 @@ export default function AvailabilityCalendar({ token }) {
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(null);
 
-  const fetchCalendar = async () => {
+  const fetchCalendar = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/calendar?days=30`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -23,11 +23,11 @@ export default function AvailabilityCalendar({ token }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchCalendar();
-  }, [token]);
+  }, [fetchCalendar]);
 
   if (loading) {
     return (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function CancellationsRefunds({ token, bookings, onRefreshBookings }) {
@@ -14,7 +14,7 @@ export default function CancellationsRefunds({ token, bookings, onRefreshBooking
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchRefunds = async () => {
+  const fetchRefunds = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/refunds`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -28,11 +28,11 @@ export default function CancellationsRefunds({ token, bookings, onRefreshBooking
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchRefunds();
-  }, [token]);
+  }, [fetchRefunds]);
 
   const activeCancellableBookings = bookings.filter((b) => b.status !== 'Cancelled');
 

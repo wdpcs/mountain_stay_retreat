@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function GuestDirectory({ token }) {
@@ -7,7 +7,7 @@ export default function GuestDirectory({ token }) {
   const [search, setSearch] = useState('');
   const [selectedGuest, setSelectedGuest] = useState(null);
 
-  const fetchGuests = async () => {
+  const fetchGuests = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/guests`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -21,11 +21,11 @@ export default function GuestDirectory({ token }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchGuests();
-  }, [token]);
+  }, [fetchGuests]);
 
   const filtered = useMemo(() => {
     if (!search) return guests;

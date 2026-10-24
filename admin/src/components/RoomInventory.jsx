@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function RoomInventory({ token, onPricesUpdated }) {
@@ -17,7 +17,7 @@ export default function RoomInventory({ token, onPricesUpdated }) {
   const [dormReason, setDormReason] = useState('');
   const [maintSuccess, setMaintSuccess] = useState('');
 
-  const fetchInventory = async () => {
+  const fetchInventory = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/inventory`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -41,11 +41,11 @@ export default function RoomInventory({ token, onPricesUpdated }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchInventory();
-  }, [token]);
+  }, [fetchInventory]);
 
   const handleSavePrices = async (e) => {
     e.preventDefault();

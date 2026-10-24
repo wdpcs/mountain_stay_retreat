@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function AdminSettings({ token, currentUser }) {
@@ -7,7 +7,7 @@ export default function AdminSettings({ token, currentUser }) {
   const [saveSuccess, setSaveSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const fetchSettings = async () => {
+  const fetchSettings = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/settings`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -21,11 +21,11 @@ export default function AdminSettings({ token, currentUser }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchSettings();
-  }, [token]);
+  }, [fetchSettings]);
 
   const handleSave = async (e) => {
     e.preventDefault();

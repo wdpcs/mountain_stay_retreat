@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 
 export default function AuditLogs({ token }) {
@@ -7,7 +7,7 @@ export default function AuditLogs({ token }) {
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState('All');
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/audit-logs`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -21,11 +21,11 @@ export default function AuditLogs({ token }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     fetchLogs();
-  }, [token]);
+  }, [fetchLogs]);
 
   const filtered = useMemo(() => {
     return logs.filter((l) => {
