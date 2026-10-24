@@ -15,8 +15,11 @@ dist-ssr
 .env.*
 Server/.env
 Server/.env.*
+admin/.env
+admin/.env.*
 !.env.example
 !Server/.env.example
+!admin/.env.example
 
 # Design source files
 public/**/*.psd
