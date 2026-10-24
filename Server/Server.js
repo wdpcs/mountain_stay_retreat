@@ -1241,6 +1241,121 @@ app.delete('/api/admin/notifications/:id', requireAuth(), (req, res) => {
   res.json({ success: true, message: 'Notification removed', unreadCount });
 });
 
+// System Data Reset (Super Admin only)
+app.post('/api/admin/system/reset', requireAuth(['admin']), (req, res) => {
+  const { mode = 'factory_seed' } = req.body;
+
+  if (mode === 'clear_all') {
+    bookings = [];
+    transactions = [];
+    refunds = [];
+    notifications = [];
+    maintenanceStatus = {
+      maintenanceSuites: 0,
+      maintenanceDormBeds: 0,
+      suiteMaintenanceReason: '',
+      dormMaintenanceReason: '',
+      updatedAt: new Date().toISOString(),
+    };
+    logAuditEvent(
+      req.adminUser,
+      'DATA_RESET_CLEAR_ALL',
+      'System',
+      'ALL_RECORDS',
+      'Cleared all active bookings, transactions, and refund records.',
+      req
+    );
+    return res.json({
+      success: true,
+      message: 'All reservation and transaction history records have been cleared successfully.',
+    });
+  }
+
+  // Default: Restore clean demo seed
+  const todayStr = new Date().toISOString().split('T')[0];
+  bookings = [
+    {
+      id: 'MSR-RZP-984210',
+      name: 'Anand Kumar',
+      email: 'anand.k@gmail.com',
+      phone: '+91 98450 12345',
+      date: todayStr,
+      roomType: 'Suite Room (₹2,500/night)',
+      amount: 2500,
+      paymentMethod: 'Online Pre-payment (Razorpay)',
+      status: 'Paid Online',
+      notes: 'Ground floor requested',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'MSR-CTR-482910',
+      name: 'Priya Sharma',
+      email: 'priya.s@yahoo.com',
+      phone: '+91 97412 67890',
+      date: todayStr,
+      roomType: 'Dormitory Bed (₹450/night)',
+      amount: 450,
+      paymentMethod: 'Pay at Counter / Property',
+      status: 'Checked In',
+      notes: 'Walk-in booking recorded by reception',
+      createdAt: new Date().toISOString(),
+    },
+  ];
+
+  transactions = [
+    {
+      id: 'TXN-984210',
+      orderId: 'order_RZP984210',
+      paymentId: 'pay_984210_captured',
+      bookingId: 'MSR-RZP-984210',
+      guestName: 'Anand Kumar',
+      amount: 2500,
+      paymentMethod: 'UPI / Razorpay',
+      status: 'Captured',
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'TXN-482910',
+      orderId: 'counter_manual',
+      paymentId: 'CASH_REC_4829',
+      bookingId: 'MSR-CTR-482910',
+      guestName: 'Priya Sharma',
+      amount: 450,
+      paymentMethod: 'Cash at Counter',
+      status: 'Captured',
+      createdAt: new Date().toISOString(),
+    },
+  ];
+
+  refunds = [];
+  notifications = [];
+  roomPrices = {
+    suitePrice: 2500,
+    dormPrice: 450,
+  };
+  maintenanceStatus = {
+    maintenanceSuites: 0,
+    maintenanceDormBeds: 0,
+    suiteMaintenanceReason: '',
+    dormMaintenanceReason: '',
+    updatedAt: new Date().toISOString(),
+  };
+
+  logAuditEvent(
+    req.adminUser,
+    'DATA_RESET_FACTORY',
+    'System',
+    'FACTORY_SEED',
+    'Restored all reservations, inventory tariffs, and transactions to factory defaults.',
+    req
+  );
+
+  res.json({
+    success: true,
+    message: 'System data successfully restored to factory defaults.',
+  });
+});
+
 // Public health check
 app.get('/api/health', (req, res) => {
   res.json({

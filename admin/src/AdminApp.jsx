@@ -515,7 +515,15 @@ export default function AdminApp() {
         )}
 
         {activeTab === 'settings' && (
-          <AdminSettings token={token} currentUser={currentUser} />
+          <AdminSettings
+            token={token}
+            currentUser={currentUser}
+            onDataReset={() => {
+              fetchStats();
+              fetchBookings();
+              fetchNotifications();
+            }}
+          />
         )}
       </main>
 

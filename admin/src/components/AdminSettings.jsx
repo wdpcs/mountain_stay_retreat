@@ -1,11 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
+import UserManagement from './UserManagement';
 
-export default function AdminSettings({ token, currentUser }) {
+export default function AdminSettings({ token, currentUser, onDataReset }) {
+  const [activeSubTab, setActiveSubTab] = useState('profile');
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Reset modal state
+  const [resetModalMode, setResetModalMode] = useState(null); // 'factory_seed' or 'clear_all'
+  const [confirmInput, setConfirmInput] = useState('');
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState('');
+  const [resetError, setResetError] = useState('');
 
   const fetchSettings = useCallback(async () => {
     try {
@@ -53,6 +62,42 @@ export default function AdminSettings({ token, currentUser }) {
     }
   };
 
+  const handleExecuteReset = async () => {
+    if (confirmInput.trim().toUpperCase() !== 'RESET') {
+      setResetError('Please type RESET exactly to confirm.');
+      return;
+    }
+
+    setResetError('');
+    setResetLoading(true);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/system/reset`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ mode: resetModalMode }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setResetSuccess(data.message || 'Data reset executed successfully!');
+        setResetModalMode(null);
+        setConfirmInput('');
+        if (onDataReset) onDataReset();
+        setTimeout(() => setResetSuccess(''), 4000);
+      } else {
+        setResetError(data.error || 'Failed to execute system data reset.');
+      }
+    } catch {
+      setResetError('Server connection error. Please ensure backend is running.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   if (loading || !settings) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -65,20 +110,20 @@ export default function AdminSettings({ token, currentUser }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Settings Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-blue-200/80 bg-gradient-to-r from-blue-50 via-indigo-50/40 to-white p-6 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xl">⚙️</span>
             <span className="text-xs font-bold uppercase tracking-wider text-blue-700">
-              System Configuration
+              System Configuration & Administration
             </span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
-            Society Profile & Gateway Settings
+            Portal Settings & Controls
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
-            Operational hours, contact phone numbers, and payment gateway configuration
+            Manage society profile, user accounts, payment routes, and system data maintenance
           </p>
         </div>
 
@@ -89,229 +134,482 @@ export default function AdminSettings({ token, currentUser }) {
         )}
       </div>
 
-      <form onSubmit={handleSave} className="space-y-6">
-        {saveSuccess && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-xs text-emerald-800 font-bold">
-            {saveSuccess}
+      {/* Sub-Navigation Pills Inside Settings */}
+      <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveSubTab('profile')}
+          className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition whitespace-nowrap ${
+            activeSubTab === 'profile'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+          }`}
+        >
+          <span>🏛️</span>
+          <span>Society Profile</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('users')}
+          className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition whitespace-nowrap ${
+            activeSubTab === 'users'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+          }`}
+        >
+          <span>👥</span>
+          <span>User Management</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('domains')}
+          className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition whitespace-nowrap ${
+            activeSubTab === 'domains'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+          }`}
+        >
+          <span>💳</span>
+          <span>Gateway & Routing</span>
+        </button>
+
+        <button
+          onClick={() => setActiveSubTab('reset')}
+          className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition whitespace-nowrap ${
+            activeSubTab === 'reset'
+              ? 'bg-rose-600 text-white shadow-xs'
+              : 'bg-white text-rose-700 border border-rose-200 hover:bg-rose-50'
+          }`}
+        >
+          <span>⚠️</span>
+          <span>Data Reset Option</span>
+        </button>
+      </div>
+
+      {/* Global Success / Reset Alert */}
+      {resetSuccess && (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-bold text-emerald-800 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🎉</span>
+            <span>{resetSuccess}</span>
           </div>
-        )}
-
-        {/* Entity Metadata */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <span>🏛️</span>
-            <span>Parent Entity & Facility Profile</span>
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div>
-              <label className="block text-slate-700 font-bold mb-1">
-                Registered Society Name
-              </label>
-              <input
-                type="text"
-                disabled={!isSuperAdmin}
-                value={settings.societyName || ''}
-                onChange={(e) => setSettings({ ...settings, societyName: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60"
-              />
-            </div>
-
-            <div>
-              <label className="block text-slate-700 font-bold mb-1">
-                Accommodation Facility Name
-              </label>
-              <input
-                type="text"
-                disabled={!isSuperAdmin}
-                value={settings.property || ''}
-                onChange={(e) => setSettings({ ...settings, property: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-slate-700 font-bold mb-1">
-                Property Physical Address
-              </label>
-              <input
-                type="text"
-                disabled={!isSuperAdmin}
-                value={settings.address || ''}
-                onChange={(e) => setSettings({ ...settings, address: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60"
-              />
-            </div>
-          </div>
+          <button
+            onClick={() => setResetSuccess('')}
+            className="text-slate-400 hover:text-slate-700"
+          >
+            ✕
+          </button>
         </div>
+      )}
 
-        {/* Operating Hours & Contact */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <span>⏰</span>
-            <span>Operating Timings & Front Desk Contacts</span>
-          </h3>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-            <div>
-              <label className="block text-slate-700 font-bold mb-1">
-                Standard Check-in Time
-              </label>
-              <input
-                type="time"
-                disabled={!isSuperAdmin}
-                value={settings.checkInTime || '13:00'}
-                onChange={(e) => setSettings({ ...settings, checkInTime: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60 font-mono"
-              />
+      {/* SUB-TAB 1: SOCIETY & FACILITY PROFILE */}
+      {activeSubTab === 'profile' && (
+        <form onSubmit={handleSave} className="space-y-6">
+          {saveSuccess && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-xs text-emerald-800 font-bold">
+              {saveSuccess}
             </div>
+          )}
 
-            <div>
-              <label className="block text-slate-700 font-bold mb-1">
-                Standard Check-out Time
-              </label>
-              <input
-                type="time"
-                disabled={!isSuperAdmin}
-                value={settings.checkOutTime || '12:00'}
-                onChange={(e) => setSettings({ ...settings, checkOutTime: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60 font-mono"
-              />
-            </div>
+          {/* Entity Metadata */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span>🏛️</span>
+              <span>Parent Entity & Facility Profile</span>
+            </h3>
 
-            <div>
-              <label className="block text-slate-700 font-bold mb-1">
-                Reception Duty Phone
-              </label>
-              <input
-                type="text"
-                disabled={!isSuperAdmin}
-                value={settings.receptionPhone || ''}
-                onChange={(e) => setSettings({ ...settings, receptionPhone: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60"
-              />
-            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Registered Society Name
+                </label>
+                <input
+                  type="text"
+                  disabled={!isSuperAdmin}
+                  value={settings.societyName || ''}
+                  onChange={(e) => setSettings({ ...settings, societyName: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60"
+                />
+              </div>
 
-            <div>
-              <label className="block text-slate-700 font-bold mb-1">
-                Manager Contact Phone
-              </label>
-              <input
-                type="text"
-                disabled={!isSuperAdmin}
-                value={settings.managerPhone || ''}
-                onChange={(e) => setSettings({ ...settings, managerPhone: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60"
-              />
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Accommodation Facility Name
+                </label>
+                <input
+                  type="text"
+                  disabled={!isSuperAdmin}
+                  value={settings.property || ''}
+                  onChange={(e) => setSettings({ ...settings, property: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-slate-700 font-bold mb-1">
+                  Property Physical Address
+                </label>
+                <input
+                  type="text"
+                  disabled={!isSuperAdmin}
+                  value={settings.address || ''}
+                  onChange={(e) => setSettings({ ...settings, address: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60"
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Payment Gateway Mode */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <span>💳</span>
-            <span>Razorpay Payment Gateway Mode</span>
-          </h3>
+          {/* Operating Hours & Contact */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span>⏰</span>
+              <span>Operating Timings & Front Desk Contacts</span>
+            </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div>
-              <label className="block text-slate-700 font-bold mb-1">
-                Active Gateway Environment
-              </label>
-              <select
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Standard Check-in Time
+                </label>
+                <input
+                  type="time"
+                  disabled={!isSuperAdmin}
+                  value={settings.checkInTime || '13:00'}
+                  onChange={(e) => setSettings({ ...settings, checkInTime: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Standard Check-out Time
+                </label>
+                <input
+                  type="time"
+                  disabled={!isSuperAdmin}
+                  value={settings.checkOutTime || '12:00'}
+                  onChange={(e) => setSettings({ ...settings, checkOutTime: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Reception Duty Phone
+                </label>
+                <input
+                  type="text"
+                  disabled={!isSuperAdmin}
+                  value={settings.receptionPhone || ''}
+                  onChange={(e) => setSettings({ ...settings, receptionPhone: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Manager Contact Phone
+                </label>
+                <input
+                  type="text"
+                  disabled={!isSuperAdmin}
+                  value={settings.managerPhone || ''}
+                  onChange={(e) => setSettings({ ...settings, managerPhone: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Cancellation Policy */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span>📄</span>
+              <span>Standard Cancellation & Retention Policy</span>
+            </h3>
+
+            <div className="text-xs">
+              <textarea
+                rows="3"
                 disabled={!isSuperAdmin}
-                value={settings.razorpayMode || 'test'}
-                onChange={(e) => setSettings({ ...settings, razorpayMode: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60 font-bold"
+                value={settings.cancellationPolicy || ''}
+                onChange={(e) => setSettings({ ...settings, cancellationPolicy: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60 leading-relaxed font-medium"
+              ></textarea>
+            </div>
+          </div>
+
+          {isSuperAdmin && (
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="rounded-xl bg-blue-600 px-6 py-3 font-bold text-xs text-white shadow-xs hover:bg-blue-700 transition disabled:opacity-50"
               >
-                <option value="test">Sandbox Test Mode (Simulated Payments)</option>
-                <option value="live">Live Production Gateway (Real Transactions)</option>
-              </select>
+                {isSubmitting ? 'Saving...' : 'Save Configuration Changes'}
+              </button>
             </div>
+          )}
+        </form>
+      )}
 
-            <div>
-              <label className="block text-slate-700 font-bold mb-1">
-                Server Credentials Status
-              </label>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-700 flex items-center justify-between font-medium">
-                <span className="font-mono text-xs">RAZORPAY_KEY_SECRET</span>
-                <span className="font-mono text-emerald-700 font-bold text-[11px] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                  Protected on Server
+      {/* SUB-TAB 2: EMBEDDED USER MANAGEMENT */}
+      {activeSubTab === 'users' && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 text-xs text-blue-900 font-medium flex items-center gap-2">
+            <span>🛡️</span>
+            <span>
+              Manage all administrative and reception personnel, create credentials, and configure
+              role-based permissions directly from settings.
+            </span>
+          </div>
+          <UserManagement token={token} currentUser={currentUser} />
+        </div>
+      )}
+
+      {/* SUB-TAB 3: GATEWAY & ROUTING */}
+      {activeSubTab === 'domains' && (
+        <div className="space-y-6">
+          {/* Payment Gateway Mode */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span>💳</span>
+              <span>Razorpay Payment Gateway Mode</span>
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Active Gateway Environment
+                </label>
+                <select
+                  disabled={!isSuperAdmin}
+                  value={settings.razorpayMode || 'test'}
+                  onChange={(e) => setSettings({ ...settings, razorpayMode: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60 font-bold"
+                >
+                  <option value="test">Sandbox Test Mode (Simulated Payments)</option>
+                  <option value="live">Live Production Gateway (Real Transactions)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  Server Credentials Status
+                </label>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-700 flex items-center justify-between font-medium">
+                  <span className="font-mono text-xs">RAZORPAY_KEY_SECRET</span>
+                  <span className="font-mono text-emerald-700 font-bold text-[11px] bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                    Protected on Server
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Domain Mapping Reference */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-3">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span>🌐</span>
+              <span>Three-Tier Domain Routing Configuration</span>
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+                <span className="text-slate-500 text-[10px] uppercase font-bold block">
+                  Public Guest Frontend
                 </span>
+                <a
+                  href="https://rooms.wdpcs.in"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-blue-600 font-mono font-bold hover:underline"
+                >
+                  rooms.wdpcs.in
+                </a>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+                <span className="text-slate-500 text-[10px] uppercase font-bold block">
+                  Admin Operations Portal
+                </span>
+                <span className="text-emerald-700 font-mono font-bold">roomsadmin.wdpcs.in</span>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
+                <span className="text-slate-500 text-[10px] uppercase font-bold block">
+                  Central Backend API
+                </span>
+                <span className="text-indigo-700 font-mono font-bold">api.wdpcs.in</span>
               </div>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Cancellation Policy */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <span>📄</span>
-            <span>Standard Cancellation & Retention Policy</span>
-          </h3>
-
-          <div className="text-xs">
-            <textarea
-              rows="3"
-              disabled={!isSuperAdmin}
-              value={settings.cancellationPolicy || ''}
-              onChange={(e) => setSettings({ ...settings, cancellationPolicy: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60 leading-relaxed font-medium"
-            ></textarea>
-          </div>
-        </div>
-
-        {/* Domain Mapping Reference */}
-        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-3">
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <span>🌐</span>
-            <span>Three-Tier Domain Routing Configuration</span>
-          </h3>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
-              <span className="text-slate-500 text-[10px] uppercase font-bold block">
-                Public Guest Frontend
+      {/* SUB-TAB 4: DATA RESET OPTION & SYSTEM MAINTENANCE */}
+      {activeSubTab === 'reset' && (
+        <div className="space-y-6">
+          <div className="rounded-3xl border border-rose-200 bg-gradient-to-r from-rose-50 via-orange-50/30 to-white p-6 shadow-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">⚠️</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
+                Data Maintenance & Reset Control
               </span>
-              <a
-                href="https://rooms.wdpcs.in"
-                target="_blank"
-                rel="noreferrer"
-                className="text-blue-600 font-mono font-bold hover:underline"
+            </div>
+            <h3 className="text-xl font-extrabold text-slate-900 mt-1">
+              System State & Data Reset Utilities
+            </h3>
+            <p className="text-xs text-slate-600 font-medium mt-0.5 leading-relaxed">
+              Use these tools to re-initialize demonstration records or purge transactional test data
+              prior to production rollout. All actions require Super Admin privileges and an explicit
+              confirmation phrase.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Action Card 1: Restore Demo Seed Baseline */}
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🔄</span>
+                  <h4 className="text-base font-bold text-slate-900">
+                    Restore Baseline Factory Data
+                  </h4>
+                </div>
+                <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                  Restores verified sample bookings, clean simulated transactions, and resets all
+                  room inventory to default tariffs (₹2,500 Suite / ₹450 Dorm). Useful for testing
+                  features, onboarding staff, or demonstrating the portal.
+                </p>
+                <div className="mt-3 rounded-xl bg-slate-50 border border-slate-200 p-2.5 text-[11px] text-slate-600 space-y-1">
+                  <div>• Resets Bookings to 2 sample reservations</div>
+                  <div>• Restores standard Razorpay and Counter transactions</div>
+                  <div>• Clears room maintenance blocks</div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setResetModalMode('factory_seed');
+                  setConfirmInput('');
+                  setResetError('');
+                }}
+                disabled={!isSuperAdmin}
+                className="w-full rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition disabled:opacity-50"
               >
-                rooms.wdpcs.in
-              </a>
+                Restore Factory Demo Data
+              </button>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
-              <span className="text-slate-500 text-[10px] uppercase font-bold block">
-                Admin Operations Portal
-              </span>
-              <span className="text-emerald-700 font-mono font-bold">roomsadmin.wdpcs.in</span>
-            </div>
+            {/* Action Card 2: Purge All Active Reservations */}
+            <div className="rounded-3xl border border-rose-200 bg-white p-6 shadow-xs flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">🗑️</span>
+                  <h4 className="text-base font-bold text-rose-800">
+                    Purge All Reservations & History
+                  </h4>
+                </div>
+                <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                  Completely wipes all active and archived booking reservations, payment
+                  transactions, and refund logs. Provides a 100% clean, blank slate for real guests.
+                  Staff accounts and login credentials remain completely intact.
+                </p>
+                <div className="mt-3 rounded-xl bg-rose-50 border border-rose-200 p-2.5 text-[11px] text-rose-800 space-y-1 font-medium">
+                  <div>• Clears all bookings (0 total reservations)</div>
+                  <div>• Wipes transactions and refund ledger</div>
+                  <div>• Preserves all staff accounts and system settings</div>
+                </div>
+              </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3.5">
-              <span className="text-slate-500 text-[10px] uppercase font-bold block">
-                Central Backend API
-              </span>
-              <span className="text-indigo-700 font-mono font-bold">api.wdpcs.in</span>
+              <button
+                onClick={() => {
+                  setResetModalMode('clear_all');
+                  setConfirmInput('');
+                  setResetError('');
+                }}
+                disabled={!isSuperAdmin}
+                className="w-full rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-rose-700 transition disabled:opacity-50"
+              >
+                Purge All Reservations (Clean Slate)
+              </button>
             </div>
           </div>
         </div>
+      )}
 
-        {isSuperAdmin && (
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="rounded-xl bg-blue-600 px-6 py-3 font-bold text-xs text-white shadow-xs hover:bg-blue-700 transition disabled:opacity-50"
-            >
-              {isSubmitting ? 'Saving...' : 'Save Configuration Changes'}
-            </button>
+      {/* Explicit Confirmation Modal for Data Reset */}
+      {resetModalMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-3xl border border-rose-200 bg-white p-6 text-slate-800 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">⚠️</span>
+                <div>
+                  <h3 className="text-base font-extrabold text-slate-900">
+                    {resetModalMode === 'clear_all'
+                      ? 'Confirm Full Data Purge'
+                      : 'Confirm Factory Data Reset'}
+                  </h3>
+                  <span className="text-[11px] text-rose-600 font-bold uppercase tracking-wider">
+                    Irreversible Operation
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setResetModalMode(null)}
+                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed font-medium">
+              {resetModalMode === 'clear_all'
+                ? 'You are about to completely wipe all bookings, counter receipts, online payments, and refund records. This cannot be undone.'
+                : 'You are about to restore default demonstration bookings, pricing, and transactions. Any custom walk-in bookings created during testing will be replaced with clean seed data.'}
+            </p>
+
+            {resetError && (
+              <div className="rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-xs text-rose-700 font-bold">
+                {resetError}
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800">
+                To confirm this operation, type <span className="font-mono text-rose-600">RESET</span> below:
+              </label>
+              <input
+                type="text"
+                value={confirmInput}
+                onChange={(e) => setConfirmInput(e.target.value)}
+                placeholder="Type RESET"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 font-mono font-bold text-xs outline-none focus:border-rose-500 focus:bg-white transition"
+              />
+            </div>
+
+            <div className="pt-2 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setResetModalMode(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-xs text-slate-600 hover:bg-slate-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteReset}
+                disabled={confirmInput.trim().toUpperCase() !== 'RESET' || resetLoading}
+                className="rounded-xl bg-rose-600 px-4 py-2 font-bold text-xs text-white hover:bg-rose-700 transition disabled:opacity-40 shadow-xs"
+              >
+                {resetLoading ? 'Executing Reset...' : 'Execute Reset Now'}
+              </button>
+            </div>
           </div>
-        )}
-      </form>
+        </div>
+      )}
     </div>
   );
 }
