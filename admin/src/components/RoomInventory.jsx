@@ -104,7 +104,7 @@ export default function RoomInventory({ token, onPricesUpdated }) {
   if (loading || !inventory) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-t-transparent"></div>
       </div>
     );
   }
@@ -112,40 +112,40 @@ export default function RoomInventory({ token, onPricesUpdated }) {
   const getStatusColor = (status) => {
     switch (status) {
       case 'Available':
-        return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
+        return 'border-emerald-200 bg-emerald-50/70 text-emerald-800';
       case 'Occupied':
-        return 'border-indigo-500/30 bg-indigo-500/10 text-indigo-300';
+        return 'border-blue-200 bg-blue-50/70 text-blue-800';
       case 'Reserved':
-        return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
+        return 'border-amber-200 bg-amber-50/70 text-amber-800';
       case 'Maintenance':
-        return 'border-rose-500/30 bg-rose-500/10 text-rose-300';
+        return 'border-rose-200 bg-rose-50/70 text-rose-800';
       default:
-        return 'border-slate-800 bg-slate-900 text-slate-300';
+        return 'border-slate-200 bg-slate-50 text-slate-700';
     }
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-blue-200/80 bg-gradient-to-r from-blue-50 via-indigo-50/40 to-white p-6 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xl">🛏️</span>
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-700">
               Inventory & Capacity
             </span>
           </div>
-          <h2 className="text-2xl font-bold text-white mt-1">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
             Room & Dormitory Inventory Control
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
             Manage physical rooms, maintenance blocks, and dynamic public tariff rates
           </p>
         </div>
 
         <button
           onClick={fetchInventory}
-          className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-bold text-slate-200 hover:bg-slate-700 transition"
+          className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
         >
           🔄 Refresh Status
         </button>
@@ -154,29 +154,31 @@ export default function RoomInventory({ token, onPricesUpdated }) {
       {/* Pricing & Maintenance Controls (Side-by-side) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Dynamic Rate Manager */}
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
-          <div className="flex items-center gap-2 mb-4">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+          <div className="flex items-center gap-2">
             <span className="text-lg">💵</span>
             <div>
-              <h3 className="text-base font-bold text-white">Dynamic Rate Manager</h3>
-              <p className="text-xs text-slate-400">Updates prices live on rooms.wdpcs.in</p>
+              <h3 className="text-base font-bold text-slate-900">Dynamic Rate Manager</h3>
+              <p className="text-xs text-slate-500">Updates prices live on rooms.wdpcs.in</p>
             </div>
           </div>
 
           <form onSubmit={handleSavePrices} className="space-y-4">
             {priceSuccess && (
-              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300 font-semibold">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 font-bold">
                 {priceSuccess}
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-700 mb-1">
                   Suite Rate (Per Night)
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-2.5 text-xs text-slate-400 font-bold">₹</span>
+                  <span className="absolute left-3.5 top-2.5 text-xs text-slate-400 font-bold">
+                    ₹
+                  </span>
                   <input
                     type="number"
                     min="500"
@@ -184,17 +186,19 @@ export default function RoomInventory({ token, onPricesUpdated }) {
                     value={suitePriceInput}
                     onChange={(e) => setSuitePriceInput(e.target.value)}
                     required
-                    className="w-full rounded-2xl border border-slate-800 bg-slate-950 py-2.5 pl-8 pr-3 text-sm font-bold text-white outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-8 pr-3 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-700 mb-1">
                   Dormitory Bed Rate (Per Night)
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3.5 top-2.5 text-xs text-slate-400 font-bold">₹</span>
+                  <span className="absolute left-3.5 top-2.5 text-xs text-slate-400 font-bold">
+                    ₹
+                  </span>
                   <input
                     type="number"
                     min="100"
@@ -202,7 +206,7 @@ export default function RoomInventory({ token, onPricesUpdated }) {
                     value={dormPriceInput}
                     onChange={(e) => setDormPriceInput(e.target.value)}
                     required
-                    className="w-full rounded-2xl border border-slate-800 bg-slate-950 py-2.5 pl-8 pr-3 text-sm font-bold text-white outline-none focus:border-blue-500"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-8 pr-3 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition"
                   />
                 </div>
               </div>
@@ -210,7 +214,7 @@ export default function RoomInventory({ token, onPricesUpdated }) {
 
             <button
               type="submit"
-              className="w-full rounded-2xl bg-blue-600 py-3 text-xs font-bold text-white shadow-lg hover:bg-blue-500 transition"
+              className="w-full rounded-xl bg-blue-600 py-3 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition"
             >
               Save & Broadcast Rates Live
             </button>
@@ -218,25 +222,25 @@ export default function RoomInventory({ token, onPricesUpdated }) {
         </div>
 
         {/* Maintenance Blocks */}
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
-          <div className="flex items-center gap-2 mb-4">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+          <div className="flex items-center gap-2">
             <span className="text-lg">🛠️</span>
             <div>
-              <h3 className="text-base font-bold text-white">Maintenance Mode Blocks</h3>
-              <p className="text-xs text-slate-400">Blocks rooms from public reservation</p>
+              <h3 className="text-base font-bold text-slate-900">Maintenance Mode Blocks</h3>
+              <p className="text-xs text-slate-500">Blocks rooms from public reservation</p>
             </div>
           </div>
 
           <form onSubmit={handleSaveMaintenance} className="space-y-3">
             {maintSuccess && (
-              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300 font-semibold">
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 font-bold">
                 {maintSuccess}
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-700 mb-1">
                   Suites in Maintenance (0-5)
                 </label>
                 <input
@@ -245,12 +249,12 @@ export default function RoomInventory({ token, onPricesUpdated }) {
                   max="5"
                   value={maintSuites}
                   onChange={(e) => setMaintSuites(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950 py-2 px-3 text-sm font-bold text-white outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-bold text-slate-700 mb-1">
                   Dorm Beds in Maintenance (0-15)
                 </label>
                 <input
@@ -259,13 +263,13 @@ export default function RoomInventory({ token, onPricesUpdated }) {
                   max="15"
                   value={maintDorm}
                   onChange={(e) => setMaintDorm(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950 py-2 px-3 text-sm font-bold text-white outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
                 Maintenance Reason / Details
               </label>
               <input
@@ -276,13 +280,13 @@ export default function RoomInventory({ token, onPricesUpdated }) {
                   setDormReason(e.target.value);
                 }}
                 placeholder="e.g. Annual painting, plumbing repair, or AC servicing"
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950 py-2 px-3 text-xs text-white placeholder-slate-500 outline-none focus:border-blue-500"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 px-3 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white transition"
               />
             </div>
 
             <button
               type="submit"
-              className="w-full rounded-2xl bg-amber-600 py-3 text-xs font-bold text-white shadow-lg hover:bg-amber-500 transition"
+              className="w-full rounded-xl bg-amber-600 py-3 text-xs font-bold text-white shadow-xs hover:bg-amber-700 transition"
             >
               Update Maintenance Restrictions
             </button>
@@ -291,18 +295,16 @@ export default function RoomInventory({ token, onPricesUpdated }) {
       </div>
 
       {/* Physical Units Visual Grid: 5 Suite Rooms */}
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-4">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span>🏨</span>
               <span>Luxury Suites Status (5 Units)</span>
             </h3>
-            <p className="text-xs text-slate-400">
-              Live status for Suite rooms on the property
-            </p>
+            <p className="text-xs text-slate-500">Live status for Suite rooms on the property</p>
           </div>
-          <span className="text-xs text-slate-400 font-mono">
+          <span className="text-xs text-slate-600 font-mono font-bold bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg">
             Rate: ₹{inventory.roomPrices?.suitePrice}/night
           </span>
         </div>
@@ -314,24 +316,36 @@ export default function RoomInventory({ token, onPricesUpdated }) {
               className={`rounded-2xl border p-4 transition ${getStatusColor(suite.status)}`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-bold text-sm text-white">{suite.number}</span>
+                <span className="font-extrabold text-sm text-slate-900">{suite.number}</span>
                 <span className="text-xs">
-                  {suite.status === 'Available' ? '🟢' : suite.status === 'Occupied' ? '🔵' : suite.status === 'Reserved' ? '🟡' : '🔴'}
+                  {suite.status === 'Available'
+                    ? '🟢'
+                    : suite.status === 'Occupied'
+                    ? '🔵'
+                    : suite.status === 'Reserved'
+                    ? '🟡'
+                    : '🔴'}
                 </span>
               </div>
-              <div className="mt-2 text-xs font-bold">{suite.status}</div>
+              <div className="mt-2 text-xs font-extrabold uppercase tracking-wider">
+                {suite.status}
+              </div>
 
               {suite.currentGuest ? (
-                <div className="mt-2 pt-2 border-t border-slate-800/80 text-[11px] text-slate-300">
-                  <div className="font-semibold text-white truncate">{suite.currentGuest.name}</div>
-                  <div className="text-slate-400 font-mono text-[10px]">{suite.currentGuest.id}</div>
+                <div className="mt-2 pt-2 border-t border-slate-200 text-[11px] text-slate-700">
+                  <div className="font-bold text-slate-900 truncate">
+                    {suite.currentGuest.name}
+                  </div>
+                  <div className="text-slate-500 font-mono text-[10px]">
+                    {suite.currentGuest.id}
+                  </div>
                 </div>
               ) : suite.maintenanceReason ? (
-                <div className="mt-2 pt-2 border-t border-rose-500/20 text-[10px] text-rose-300">
+                <div className="mt-2 pt-2 border-t border-rose-200 text-[10px] text-rose-700 font-medium">
                   {suite.maintenanceReason}
                 </div>
               ) : (
-                <div className="mt-2 text-[10px] text-slate-500">Ready for check-in</div>
+                <div className="mt-2 text-[10px] text-slate-500 font-medium">Ready for check-in</div>
               )}
             </div>
           ))}
@@ -339,18 +353,18 @@ export default function RoomInventory({ token, onPricesUpdated }) {
       </div>
 
       {/* Physical Units Visual Grid: 15 Dormitory Beds */}
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-4">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
+            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span>🛏️</span>
               <span>Dormitory Beds Status (15 Beds)</span>
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-500">
               Individual bed inventory in the shared dormitory facility
             </p>
           </div>
-          <span className="text-xs text-slate-400 font-mono">
+          <span className="text-xs text-slate-600 font-mono font-bold bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg">
             Rate: ₹{inventory.roomPrices?.dormPrice}/night
           </span>
         </div>
@@ -362,23 +376,31 @@ export default function RoomInventory({ token, onPricesUpdated }) {
               className={`rounded-2xl border p-3 transition ${getStatusColor(bed.status)}`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-bold text-xs text-white">{bed.number}</span>
+                <span className="font-extrabold text-xs text-slate-900">{bed.number}</span>
                 <span className="text-[10px]">
-                  {bed.status === 'Available' ? '🟢' : bed.status === 'Occupied' ? '🔵' : bed.status === 'Reserved' ? '🟡' : '🔴'}
+                  {bed.status === 'Available'
+                    ? '🟢'
+                    : bed.status === 'Occupied'
+                    ? '🔵'
+                    : bed.status === 'Reserved'
+                    ? '🟡'
+                    : '🔴'}
                 </span>
               </div>
-              <div className="mt-1 text-[11px] font-bold">{bed.status}</div>
+              <div className="mt-1 text-[11px] font-extrabold uppercase tracking-wider">
+                {bed.status}
+              </div>
 
               {bed.currentGuest ? (
-                <div className="mt-1.5 pt-1.5 border-t border-slate-800/80 text-[10px] text-slate-300 truncate">
+                <div className="mt-1.5 pt-1.5 border-t border-slate-200 text-[10px] text-slate-700 truncate font-semibold">
                   {bed.currentGuest.name}
                 </div>
               ) : bed.maintenanceReason ? (
-                <div className="mt-1.5 text-[9px] text-rose-300 truncate">
+                <div className="mt-1.5 text-[9px] text-rose-700 font-medium truncate">
                   {bed.maintenanceReason}
                 </div>
               ) : (
-                <div className="mt-1 text-[9px] text-slate-500">Vacant</div>
+                <div className="mt-1 text-[9px] text-slate-500 font-medium">Vacant</div>
               )}
             </div>
           ))}

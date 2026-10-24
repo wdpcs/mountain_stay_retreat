@@ -28,7 +28,18 @@ export default function ReportsExports({ token }) {
   const handleExportCSV = () => {
     if (!report || !report.bookingsRoster) return;
 
-    const headers = ['Booking ID', 'Guest Name', 'Email', 'Phone', 'Check-in Date', 'Room Type', 'Amount (INR)', 'Payment Method', 'Status', 'Booked At'];
+    const headers = [
+      'Booking ID',
+      'Guest Name',
+      'Email',
+      'Phone',
+      'Check-in Date',
+      'Room Type',
+      'Amount (INR)',
+      'Payment Method',
+      'Status',
+      'Booked At',
+    ];
     const rows = report.bookingsRoster.map((b) => [
       `"${b.id}"`,
       `"${b.name}"`,
@@ -42,11 +53,16 @@ export default function ReportsExports({ token }) {
       `"${b.createdAt}"`,
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const csvContent =
+      'data:text/csv;charset=utf-8,' +
+      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `WDPCS_Accommodation_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute(
+      'download',
+      `WDPCS_Accommodation_Report_${new Date().toISOString().split('T')[0]}.csv`
+    );
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -98,7 +114,9 @@ export default function ReportsExports({ token }) {
               </tr>
             </thead>
             <tbody>
-              ${(todayBookings.length > 0 ? todayBookings : report.bookingsRoster.slice(0, 8)).map(b => `
+              ${(todayBookings.length > 0 ? todayBookings : report.bookingsRoster.slice(0, 8))
+                .map(
+                  (b) => `
                 <tr>
                   <td style="font-family: monospace; font-weight: bold;">${b.id}</td>
                   <td><strong>${b.name}</strong></td>
@@ -109,7 +127,9 @@ export default function ReportsExports({ token }) {
                   <td>${b.status}</td>
                   <td style="width: 120px;"></td>
                 </tr>
-              `).join('')}
+              `
+                )
+                .join('')}
             </tbody>
           </table>
 
@@ -130,7 +150,7 @@ export default function ReportsExports({ token }) {
   if (loading || !report) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-t-transparent"></div>
       </div>
     );
   }
@@ -140,18 +160,18 @@ export default function ReportsExports({ token }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-blue-200/80 bg-gradient-to-r from-blue-50 via-indigo-50/40 to-white p-6 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xl">📈</span>
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-700">
               Auditing & Exports
             </span>
           </div>
-          <h2 className="text-2xl font-bold text-white mt-1">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
             Reports & Operational Analytics
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
             Financial reconciliation, occupancy reports, and CSV downloads
           </p>
         </div>
@@ -159,7 +179,7 @@ export default function ReportsExports({ token }) {
         <div className="flex flex-wrap items-center gap-2.5">
           <button
             onClick={handleExportCSV}
-            className="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-bold text-white shadow-lg shadow-emerald-600/20 hover:from-emerald-500 hover:to-teal-500 transition flex items-center gap-1.5"
+            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-emerald-700 transition flex items-center gap-1.5"
           >
             <span>📥</span>
             <span>Export Roster (CSV)</span>
@@ -167,7 +187,7 @@ export default function ReportsExports({ token }) {
 
           <button
             onClick={handlePrintDailyManifest}
-            className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-bold text-slate-200 hover:bg-slate-700 transition flex items-center gap-1.5"
+            className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs flex items-center gap-1.5"
           >
             <span>🖨️</span>
             <span>Print Reception Manifest</span>
@@ -177,31 +197,41 @@ export default function ReportsExports({ token }) {
 
       {/* High-Level Financial & Volume Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
-          <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Total Active Bookings</span>
-          <div className="mt-2 text-3xl font-extrabold text-white">{summary.activeBookings}</div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+            Total Active Bookings
+          </span>
+          <div className="mt-2 text-3xl font-extrabold text-slate-900">{summary.activeBookings}</div>
           <p className="text-[11px] text-slate-500 mt-1">Excludes cancelled records</p>
         </div>
 
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
-          <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Total Revenue Generated</span>
-          <div className="mt-2 text-3xl font-extrabold text-emerald-400">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+            Total Revenue Generated
+          </span>
+          <div className="mt-2 text-3xl font-extrabold text-emerald-700">
             ₹{summary.totalRevenue.toLocaleString('en-IN')}
           </div>
           <p className="text-[11px] text-slate-500 mt-1">Online + Counter combined</p>
         </div>
 
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
-          <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Average Booking Value</span>
-          <div className="mt-2 text-3xl font-extrabold text-blue-400">
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+            Average Booking Value
+          </span>
+          <div className="mt-2 text-3xl font-extrabold text-blue-700">
             ₹{summary.averageBookingValue.toLocaleString('en-IN')}
           </div>
           <p className="text-[11px] text-slate-500 mt-1">Average per registered booking</p>
         </div>
 
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/60 p-5">
-          <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">Cancellations</span>
-          <div className="mt-2 text-3xl font-extrabold text-rose-400">{summary.cancelledBookings}</div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+          <span className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+            Cancellations
+          </span>
+          <div className="mt-2 text-3xl font-extrabold text-rose-700">
+            {summary.cancelledBookings}
+          </div>
           <p className="text-[11px] text-slate-500 mt-1">Refunded or voided reservations</p>
         </div>
       </div>
@@ -209,72 +239,80 @@ export default function ReportsExports({ token }) {
       {/* Breakdown Grids */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Breakdown by Accommodation Type */}
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
-          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <span>🏨</span>
             <span>Accommodation Revenue Breakdown</span>
           </h3>
 
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 flex items-center justify-between">
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 flex items-center justify-between">
               <div>
-                <div className="font-bold text-white text-sm">Luxury Suites</div>
-                <div className="text-xs text-slate-400 mt-0.5">{byRoom.suites.count} Bookings Recorded</div>
+                <div className="font-bold text-slate-900 text-sm">Luxury Suites</div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  {byRoom.suites.count} Bookings Recorded
+                </div>
               </div>
               <div className="text-right">
-                <div className="font-extrabold text-emerald-400 text-lg">
+                <div className="font-extrabold text-emerald-700 text-lg">
                   ₹{byRoom.suites.revenue.toLocaleString('en-IN')}
                 </div>
-                <div className="text-[10px] text-slate-500">Tariff: ₹2,500/night</div>
+                <div className="text-[11px] text-slate-500 font-medium">Tariff: ₹2,500/night</div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 flex items-center justify-between">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 flex items-center justify-between">
               <div>
-                <div className="font-bold text-white text-sm">Dormitory Beds</div>
-                <div className="text-xs text-slate-400 mt-0.5">{byRoom.dormitory.count} Bookings Recorded</div>
+                <div className="font-bold text-slate-900 text-sm">Dormitory Beds</div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  {byRoom.dormitory.count} Bookings Recorded
+                </div>
               </div>
               <div className="text-right">
-                <div className="font-extrabold text-emerald-400 text-lg">
+                <div className="font-extrabold text-emerald-700 text-lg">
                   ₹{byRoom.dormitory.revenue.toLocaleString('en-IN')}
                 </div>
-                <div className="text-[10px] text-slate-500">Tariff: ₹450/night</div>
+                <div className="text-[11px] text-slate-500 font-medium">Tariff: ₹450/night</div>
               </div>
             </div>
           </div>
         </div>
 
         {/* Breakdown by Payment Channel */}
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
-          <h3 className="text-base font-bold text-white mb-4 flex items-center gap-2">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
             <span>💳</span>
             <span>Collection Channel Breakdown</span>
           </h3>
 
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 flex items-center justify-between">
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 flex items-center justify-between">
               <div>
-                <div className="font-bold text-white text-sm">Online Gateway (Razorpay)</div>
-                <div className="text-xs text-slate-400 mt-0.5">{byPayment.online.count} Online Transactions</div>
+                <div className="font-bold text-slate-900 text-sm">Online Gateway (Razorpay)</div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  {byPayment.online.count} Online Transactions
+                </div>
               </div>
               <div className="text-right">
-                <div className="font-extrabold text-blue-400 text-lg">
+                <div className="font-extrabold text-blue-700 text-lg">
                   ₹{byPayment.online.revenue.toLocaleString('en-IN')}
                 </div>
-                <div className="text-[10px] text-slate-500">Direct settlement</div>
+                <div className="text-[11px] text-slate-500 font-medium">Direct settlement</div>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 flex items-center justify-between">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 flex items-center justify-between">
               <div>
-                <div className="font-bold text-white text-sm">Counter / Property Receipts</div>
-                <div className="text-xs text-slate-400 mt-0.5">{byPayment.counter.count} Walk-ins & Cash Bookings</div>
+                <div className="font-bold text-slate-900 text-sm">Counter / Property Receipts</div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  {byPayment.counter.count} Walk-ins & Cash Bookings
+                </div>
               </div>
               <div className="text-right">
-                <div className="font-extrabold text-indigo-400 text-lg">
+                <div className="font-extrabold text-indigo-700 text-lg">
                   ₹{byPayment.counter.revenue.toLocaleString('en-IN')}
                 </div>
-                <div className="text-[10px] text-slate-500">Front desk custody</div>
+                <div className="text-[11px] text-slate-500 font-medium">Front desk custody</div>
               </div>
             </div>
           </div>

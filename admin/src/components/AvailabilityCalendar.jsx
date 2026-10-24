@@ -32,7 +32,7 @@ export default function AvailabilityCalendar({ token }) {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-t-transparent"></div>
       </div>
     );
   }
@@ -43,15 +43,15 @@ export default function AvailabilityCalendar({ token }) {
 
     let baseBg;
     if (totalAvail === 0) {
-      baseBg = 'border-rose-900/40 bg-rose-950/20 hover:border-rose-700/60';
+      baseBg = 'border-rose-200 bg-rose-50/60 hover:border-rose-300';
     } else if (day.suitesAvailable <= 1 || day.dormAvailable <= 3) {
-      baseBg = 'border-amber-900/40 bg-amber-950/20 hover:border-amber-700/60';
+      baseBg = 'border-amber-200 bg-amber-50/60 hover:border-amber-300';
     } else {
-      baseBg = 'border-slate-800 bg-slate-900/60 hover:border-blue-500/50';
+      baseBg = 'border-slate-200 bg-slate-50/60 hover:border-blue-300 hover:bg-blue-50/20';
     }
 
     if (isSelected) {
-      return `${baseBg} ring-2 ring-blue-500 bg-blue-950/30`;
+      return `${baseBg} ring-2 ring-blue-600 bg-blue-50 border-blue-400 shadow-xs`;
     }
     return baseBg;
   };
@@ -59,42 +59,42 @@ export default function AvailabilityCalendar({ token }) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-blue-200/80 bg-gradient-to-r from-blue-50 via-indigo-50/40 to-white p-6 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xl">🗓️</span>
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-700">
               Forward Schedule
             </span>
           </div>
-          <h2 className="text-2xl font-bold text-white mt-1">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
             30-Day Availability Calendar
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
             Forward-looking room occupancy and capacity planning
           </p>
         </div>
 
         {/* Legend */}
-        <div className="flex flex-wrap items-center gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-3 text-xs font-semibold">
           <div className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-            <span className="text-slate-300">Available</span>
+            <span className="text-slate-600">Available</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
-            <span className="text-slate-300">Limited Capacity</span>
+            <span className="text-slate-600">Limited Capacity</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-full bg-rose-500"></span>
-            <span className="text-slate-300">Fully Booked</span>
+            <span className="text-slate-600">Fully Booked</span>
           </div>
         </div>
       </div>
 
       {/* 30-Day Calendar Grid */}
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
-        <h3 className="text-sm font-bold text-slate-300 mb-4">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+        <h3 className="text-sm font-bold text-slate-700">
           Select a date to view reservations & room allocations:
         </h3>
 
@@ -113,24 +113,22 @@ export default function AvailabilityCalendar({ token }) {
                 )}`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-400">
-                    {day.dayName}
-                  </span>
-                  <span className="text-sm font-extrabold text-white">
+                  <span className="text-xs font-bold text-slate-500">{day.dayName}</span>
+                  <span className="text-sm font-extrabold text-slate-900">
                     {monthName} {dayNum}
                   </span>
                 </div>
 
                 <div className="mt-3 space-y-1 text-[11px]">
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Suites:</span>
+                    <span className="text-slate-500 font-medium">Suites:</span>
                     <span
                       className={`font-bold ${
                         day.suitesAvailable === 0
-                          ? 'text-rose-400'
+                          ? 'text-rose-700'
                           : day.suitesAvailable <= 2
-                          ? 'text-amber-400'
-                          : 'text-emerald-400'
+                          ? 'text-amber-700'
+                          : 'text-emerald-700'
                       }`}
                     >
                       {day.suitesAvailable} / {day.totalSuites}
@@ -138,14 +136,14 @@ export default function AvailabilityCalendar({ token }) {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-slate-400">Dorm:</span>
+                    <span className="text-slate-500 font-medium">Dorm:</span>
                     <span
                       className={`font-bold ${
                         day.dormAvailable === 0
-                          ? 'text-rose-400'
+                          ? 'text-rose-700'
                           : day.dormAvailable <= 4
-                          ? 'text-amber-400'
-                          : 'text-emerald-400'
+                          ? 'text-amber-700'
+                          : 'text-emerald-700'
                       }`}
                     >
                       {day.dormAvailable} / {day.totalDormBeds}
@@ -154,7 +152,7 @@ export default function AvailabilityCalendar({ token }) {
                 </div>
 
                 {day.bookings && day.bookings.length > 0 && (
-                  <div className="mt-2 text-[10px] text-blue-400 font-semibold truncate">
+                  <div className="mt-2 text-[10px] text-blue-700 font-bold truncate">
                     {day.bookings.length} Booking{day.bookings.length > 1 ? 's' : ''}
                   </div>
                 )}
@@ -166,13 +164,13 @@ export default function AvailabilityCalendar({ token }) {
 
       {/* Selected Date Detail Panel */}
       {selectedDay && (
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-4">
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
             <div>
-              <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">
+              <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">
                 Date Manifest
               </span>
-              <h3 className="text-xl font-bold text-white mt-0.5">
+              <h3 className="text-xl font-extrabold text-slate-900 mt-0.5">
                 {new Date(selectedDay.date + 'T00:00:00').toLocaleDateString('en-US', {
                   weekday: 'long',
                   year: 'numeric',
@@ -183,13 +181,17 @@ export default function AvailabilityCalendar({ token }) {
             </div>
 
             <div className="flex items-center gap-3 text-xs">
-              <div className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5">
-                <span className="text-slate-400">Suites Available: </span>
-                <strong className="text-emerald-400">{selectedDay.suitesAvailable} / {selectedDay.totalSuites}</strong>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 font-medium">
+                <span className="text-slate-600">Suites Available: </span>
+                <strong className="text-emerald-700">
+                  {selectedDay.suitesAvailable} / {selectedDay.totalSuites}
+                </strong>
               </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5">
-                <span className="text-slate-400">Dorm Beds Available: </span>
-                <strong className="text-emerald-400">{selectedDay.dormAvailable} / {selectedDay.totalDormBeds}</strong>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 font-medium">
+                <span className="text-slate-600">Dorm Beds Available: </span>
+                <strong className="text-emerald-700">
+                  {selectedDay.dormAvailable} / {selectedDay.totalDormBeds}
+                </strong>
               </div>
             </div>
           </div>
@@ -197,22 +199,22 @@ export default function AvailabilityCalendar({ token }) {
           {selectedDay.bookings && selectedDay.bookings.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="border-b border-slate-800 text-slate-400">
+                <thead className="border-b border-slate-200 bg-slate-50/70 text-slate-600 font-bold">
                   <tr>
-                    <th className="pb-2">Booking ID</th>
-                    <th className="pb-2">Guest Name</th>
-                    <th className="pb-2">Accommodation</th>
-                    <th className="pb-2">Status</th>
+                    <th className="py-2.5 px-4">Booking ID</th>
+                    <th className="py-2.5 px-4">Guest Name</th>
+                    <th className="py-2.5 px-4">Accommodation</th>
+                    <th className="py-2.5 px-4">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800 font-medium">
+                <tbody className="divide-y divide-slate-100 font-medium">
                   {selectedDay.bookings.map((b) => (
-                    <tr key={b.id} className="hover:bg-slate-800/40">
-                      <td className="py-2.5 font-mono text-blue-400 font-bold">{b.id}</td>
-                      <td className="py-2.5 text-white">{b.name}</td>
-                      <td className="py-2.5 text-slate-300">{b.roomType}</td>
-                      <td className="py-2.5">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300">
+                    <tr key={b.id} className="hover:bg-slate-50/80 transition">
+                      <td className="py-2.5 px-4 font-mono text-blue-600 font-bold">{b.id}</td>
+                      <td className="py-2.5 px-4 text-slate-900 font-bold">{b.name}</td>
+                      <td className="py-2.5 px-4 text-slate-700">{b.roomType}</td>
+                      <td className="py-2.5 px-4">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
                           {b.status}
                         </span>
                       </td>
@@ -222,8 +224,9 @@ export default function AvailabilityCalendar({ token }) {
               </table>
             </div>
           ) : (
-            <div className="rounded-2xl border border-dashed border-slate-800 p-8 text-center text-slate-500 text-xs">
-              No bookings registered for this date. Full capacity is currently available for guest reservation.
+            <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-slate-400 text-xs font-medium">
+              No bookings registered for this date. Full capacity is currently available for guest
+              reservation.
             </div>
           )}
         </div>

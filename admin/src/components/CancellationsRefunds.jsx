@@ -88,7 +88,7 @@ export default function CancellationsRefunds({ token, bookings, onRefreshBooking
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-t-transparent"></div>
       </div>
     );
   }
@@ -96,18 +96,18 @@ export default function CancellationsRefunds({ token, bookings, onRefreshBooking
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-rose-200/80 bg-gradient-to-r from-rose-50 via-orange-50/30 to-white p-6 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xl">🔄</span>
-            <span className="text-xs font-bold uppercase tracking-wider text-rose-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-rose-700">
               Cancellations & Adjustments
             </span>
           </div>
-          <h2 className="text-2xl font-bold text-white mt-1">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
             Booking Cancellations & Refunds
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
             Process reservation cancellations and manage refund disbursements
           </p>
         </div>
@@ -117,7 +117,7 @@ export default function CancellationsRefunds({ token, bookings, onRefreshBooking
             setIsModalOpen(true);
             setSubmitError('');
           }}
-          className="rounded-xl bg-gradient-to-r from-rose-600 to-rose-700 px-4 py-2.5 text-xs font-bold text-white shadow-lg hover:from-rose-500 hover:to-rose-600 transition flex items-center gap-2"
+          className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-rose-700 transition flex items-center gap-2"
         >
           <span>✕</span>
           <span>Initiate Cancellation / Refund</span>
@@ -125,56 +125,60 @@ export default function CancellationsRefunds({ token, bookings, onRefreshBooking
       </div>
 
       {/* Refunds History Table */}
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-4">
+      <div className="rounded-3xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-white">Cancellation & Refund Ledger</h3>
-            <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-300">
+            <h3 className="text-base font-bold text-slate-900">Cancellation & Refund Ledger</h3>
+            <span className="rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-xs font-bold text-slate-700">
               {refunds.length} Recorded
             </span>
           </div>
           <button
             onClick={fetchRefunds}
-            className="text-xs text-slate-400 hover:text-white"
+            className="text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center gap-1 transition"
           >
             🔄 Refresh
           </button>
         </div>
 
         {refunds.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-800 p-12 text-center text-slate-500 text-xs">
+          <div className="p-12 text-center text-slate-400 text-xs font-medium">
             No cancellation or refund records have been logged yet.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-800 text-slate-400 font-semibold">
+              <thead className="border-b border-slate-200 bg-slate-50/70 text-slate-600 font-bold">
                 <tr>
-                  <th className="pb-3">Refund Ref</th>
-                  <th className="pb-3">Booking ID</th>
-                  <th className="pb-3">Guest Name</th>
-                  <th className="pb-3">Reason</th>
-                  <th className="pb-3">Disbursement Method</th>
-                  <th className="pb-3">Original</th>
-                  <th className="pb-3">Refunded</th>
-                  <th className="pb-3">Processed By</th>
-                  <th className="pb-3 text-right">Timestamp</th>
+                  <th className="py-3 px-4">Refund Ref</th>
+                  <th className="py-3 px-4">Booking ID</th>
+                  <th className="py-3 px-4">Guest Name</th>
+                  <th className="py-3 px-4">Reason</th>
+                  <th className="py-3 px-4">Disbursement Method</th>
+                  <th className="py-3 px-4">Original</th>
+                  <th className="py-3 px-4">Refunded</th>
+                  <th className="py-3 px-4">Processed By</th>
+                  <th className="py-3 px-4 text-right">Timestamp</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 font-medium">
+              <tbody className="divide-y divide-slate-100 font-medium">
                 {refunds.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-800/40 transition">
-                    <td className="py-3 font-mono font-bold text-rose-400">{r.id}</td>
-                    <td className="py-3 font-mono text-slate-300">{r.bookingId}</td>
-                    <td className="py-3 text-white font-semibold">{r.guestName}</td>
-                    <td className="py-3 text-slate-300 max-w-xs truncate">{r.reason}</td>
-                    <td className="py-3 text-slate-300">{r.refundMethod}</td>
-                    <td className="py-3 text-slate-400">₹{(r.amount || 0).toLocaleString('en-IN')}</td>
-                    <td className="py-3 font-bold text-emerald-400">
+                  <tr key={r.id} className="hover:bg-slate-50/80 transition">
+                    <td className="py-3 px-4 font-mono font-bold text-rose-600">{r.id}</td>
+                    <td className="py-3 px-4 font-mono text-slate-700">{r.bookingId}</td>
+                    <td className="py-3 px-4 text-slate-900 font-bold">{r.guestName}</td>
+                    <td className="py-3 px-4 text-slate-700 max-w-xs truncate" title={r.reason}>
+                      {r.reason}
+                    </td>
+                    <td className="py-3 px-4 text-slate-700">{r.refundMethod}</td>
+                    <td className="py-3 px-4 text-slate-500">
+                      ₹{(r.amount || 0).toLocaleString('en-IN')}
+                    </td>
+                    <td className="py-3 px-4 font-bold text-emerald-700">
                       ₹{(r.refundAmount || 0).toLocaleString('en-IN')}
                     </td>
-                    <td className="py-3 text-slate-400 font-mono text-[11px]">{r.processedBy}</td>
-                    <td className="py-3 text-right text-slate-500 text-[11px]">
+                    <td className="py-3 px-4 text-slate-500 font-mono text-[11px]">{r.processedBy}</td>
+                    <td className="py-3 px-4 text-right text-slate-500 text-[11px] whitespace-nowrap">
                       {new Date(r.createdAt).toLocaleString('en-IN')}
                     </td>
                   </tr>
@@ -187,19 +191,21 @@ export default function CancellationsRefunds({ token, bookings, onRefreshBooking
 
       {/* Cancellation Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-6 text-white shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 text-slate-800 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <span>⚠️</span>
                   <span>Cancel Reservation & Process Refund</span>
                 </h3>
-                <p className="text-xs text-slate-400">This action updates booking status to Cancelled</p>
+                <p className="text-xs text-slate-500">
+                  This action updates booking status to Cancelled
+                </p>
               </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="rounded-full p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
               >
                 ✕
               </button>
@@ -207,20 +213,20 @@ export default function CancellationsRefunds({ token, bookings, onRefreshBooking
 
             <form onSubmit={handleProcessRefund} className="space-y-3.5 text-xs">
               {submitError && (
-                <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-rose-300">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-rose-700 font-medium">
                   {submitError}
                 </div>
               )}
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
+                <label className="block text-slate-700 font-bold mb-1">
                   Select Active Reservation
                 </label>
                 <select
                   value={selectedBookingId}
                   onChange={(e) => handleBookingSelect(e.target.value)}
                   required
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-2.5 text-white outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition"
                 >
                   <option value="">-- Choose Reservation --</option>
                   {activeCancellableBookings.map((b) => (
@@ -232,27 +238,23 @@ export default function CancellationsRefunds({ token, bookings, onRefreshBooking
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Refund Amount (₹)
-                </label>
+                <label className="block text-slate-700 font-bold mb-1">Refund Amount (₹)</label>
                 <input
                   type="number"
                   min="0"
                   value={refundAmount}
                   onChange={(e) => setRefundAmount(e.target.value)}
                   required
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-2.5 text-white font-bold outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 font-bold outline-none focus:border-blue-500 focus:bg-white transition"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Refund Method
-                </label>
+                <label className="block text-slate-700 font-bold mb-1">Refund Method</label>
                 <select
                   value={refundMethod}
                   onChange={(e) => setRefundMethod(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-2.5 text-white outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition"
                 >
                   <option value="Cash Counter Settlement">Cash Counter Settlement</option>
                   <option value="Online Razorpay Reversal">Online Razorpay Reversal</option>
@@ -261,7 +263,7 @@ export default function CancellationsRefunds({ token, bookings, onRefreshBooking
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">
+                <label className="block text-slate-700 font-bold mb-1">
                   Reason for Cancellation
                 </label>
                 <textarea
@@ -270,7 +272,7 @@ export default function CancellationsRefunds({ token, bookings, onRefreshBooking
                   onChange={(e) => setReason(e.target.value)}
                   placeholder="e.g. Guest travel emergency, double reservation, or medical reason..."
                   required
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-2.5 text-white placeholder-slate-500 outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white transition"
                 ></textarea>
               </div>
 
@@ -278,14 +280,14 @@ export default function CancellationsRefunds({ token, bookings, onRefreshBooking
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl border border-slate-700 px-4 py-2 font-semibold text-slate-300 hover:bg-slate-800"
+                  className="rounded-xl border border-slate-200 px-4 py-2 font-semibold text-slate-600 hover:bg-slate-50 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="rounded-xl bg-rose-600 px-4 py-2 font-bold text-white hover:bg-rose-500 transition disabled:opacity-50"
+                  className="rounded-xl bg-rose-600 px-4 py-2 font-bold text-white hover:bg-rose-700 transition disabled:opacity-50 shadow-xs"
                 >
                   {isSubmitting ? 'Processing...' : 'Confirm Cancellation & Refund'}
                 </button>

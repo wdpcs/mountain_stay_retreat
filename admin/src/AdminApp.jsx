@@ -240,12 +240,12 @@ export default function AdminApp() {
   const navItems = [
     { id: 'overview', label: 'Overview', icon: '📊' },
     { id: 'bookings', label: 'Bookings', icon: '📋', count: bookings.length },
-    { id: 'inventory', label: 'Inventory & Rates', icon: '🛏️' },
+    { id: 'inventory', label: 'Inventory', icon: '🛏️' },
     { id: 'calendar', label: 'Calendar', icon: '🗓️' },
-    { id: 'guests', label: 'Guest Directory', icon: '👥' },
+    { id: 'guests', label: 'Guests', icon: '👥' },
     { id: 'payments', label: 'Transactions', icon: '💳' },
     { id: 'refunds', label: 'Cancellations', icon: '🔄' },
-    { id: 'reports', label: 'Reports & Manifest', icon: '📈' },
+    { id: 'reports', label: 'Reports', icon: '📈' },
     { id: 'users', label: 'Staff Roles', icon: '🛡️' },
     { id: 'audit', label: 'Audit Logs', icon: '📜' },
     { id: 'settings', label: 'Settings', icon: '⚙️' },
@@ -397,17 +397,17 @@ export default function AdminApp() {
       </header>
 
       {/* Prominent Secondary Navigation Bar (Visible on all tabs) */}
-      <nav className="sticky top-[57px] sm:top-[65px] z-30 border-b border-slate-200 bg-white px-4 sm:px-6 py-2 shadow-xs">
-        <div className="mx-auto max-w-7xl flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+      <nav className="sticky top-[57px] sm:top-[65px] z-30 border-b border-slate-200 bg-white px-2 sm:px-4 py-2 shadow-xs">
+        <div className="mx-auto max-w-7xl flex items-center justify-between gap-1 overflow-x-auto pb-0.5 scrollbar-none">
           {navItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-bold transition flex items-center gap-1.5 shrink-0 ${
+                className={`whitespace-nowrap rounded-lg px-2 xl:px-2.5 py-1.5 text-[11px] xl:text-xs font-bold transition flex items-center gap-1 shrink-0 ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-600/20'
+                    ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/25 ring-2 ring-blue-600/20'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-slate-50/70 border border-slate-200/60'
                 }`}
               >
@@ -415,7 +415,7 @@ export default function AdminApp() {
                 <span>{item.label}</span>
                 {item.count !== undefined && (
                   <span
-                    className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
+                    className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-extrabold ${
                       isActive ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-700'
                     }`}
                   >

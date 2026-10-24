@@ -51,115 +51,121 @@ export default function AuditLogs({ token }) {
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+        <div className="h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-t-transparent"></div>
       </div>
     );
   }
 
   const getActionBadge = (act) => {
-    if (act.includes('LOGIN')) return 'bg-blue-500/10 text-blue-300 border-blue-500/20';
-    if (act.includes('DELETE')) return 'bg-rose-500/10 text-rose-300 border-rose-500/20';
-    if (act.includes('UPDATE')) return 'bg-amber-500/10 text-amber-300 border-amber-500/20';
-    if (act.includes('CREATE')) return 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20';
-    if (act.includes('REFUND')) return 'bg-purple-500/10 text-purple-300 border-purple-500/20';
-    return 'bg-slate-800 text-slate-300 border-slate-700';
+    if (act.includes('LOGIN')) return 'bg-blue-50 text-blue-700 border-blue-200';
+    if (act.includes('DELETE')) return 'bg-rose-50 text-rose-700 border-rose-200';
+    if (act.includes('UPDATE')) return 'bg-amber-50 text-amber-700 border-amber-200';
+    if (act.includes('CREATE')) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    if (act.includes('REFUND')) return 'bg-purple-50 text-purple-700 border-purple-200';
+    return 'bg-slate-100 text-slate-700 border-slate-200';
   };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-3xl border border-blue-200/80 bg-gradient-to-r from-blue-50 via-indigo-50/40 to-white p-6 shadow-xs">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-xl">📜</span>
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-400">
+            <span className="text-xs font-bold uppercase tracking-wider text-blue-700">
               Security Compliance
             </span>
           </div>
-          <h2 className="text-2xl font-bold text-white mt-1">
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
             System Audit Trail & Security Logs
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
             Tamper-evident chronological log of all administrative operations
           </p>
         </div>
 
         <button
           onClick={fetchLogs}
-          className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-xs font-bold text-slate-200 hover:bg-slate-700 transition"
+          className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs"
         >
           🔄 Refresh Log Stream
         </button>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-3xl border border-slate-800 bg-slate-900/80 p-4 shadow-xl">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
         <div className="relative w-full sm:w-80">
-          <span className="absolute left-3.5 top-2.5 text-xs text-slate-500">🔍</span>
+          <span className="absolute left-3.5 top-2.5 text-xs text-slate-400">🔍</span>
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search logs by keyword, staff, or ID..."
-            className="w-full rounded-2xl border border-slate-800 bg-slate-950 py-2 pl-9 pr-3 text-xs text-white placeholder-slate-500 outline-none focus:border-blue-500"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-9 pr-3 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-blue-500 focus:bg-white transition"
           />
         </div>
 
         <select
           value={actionFilter}
           onChange={(e) => setActionFilter(e.target.value)}
-          className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-300 outline-none focus:border-blue-500 w-full sm:w-auto"
+          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-blue-500 focus:bg-white w-full sm:w-auto transition"
         >
           <option value="All">All Operations ({logs.length})</option>
           {uniqueActions.map((a) => (
-            <option key={a} value={a}>{a}</option>
+            <option key={a} value={a}>
+              {a}
+            </option>
           ))}
         </select>
       </div>
 
       {/* Logs Table */}
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
+      <div className="rounded-3xl border border-slate-200 bg-white shadow-xs overflow-hidden">
         {filtered.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-800 p-12 text-center text-slate-500 text-xs">
+          <div className="p-12 text-center text-slate-400 text-xs font-medium">
             No audit events found matching the criteria.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-800 text-slate-400 font-semibold">
+              <thead className="border-b border-slate-200 bg-slate-50/70 text-slate-600 font-bold">
                 <tr>
-                  <th className="pb-3">Event Ref</th>
-                  <th className="pb-3">Timestamp</th>
-                  <th className="pb-3">Staff Member</th>
-                  <th className="pb-3">Action</th>
-                  <th className="pb-3">Target</th>
-                  <th className="pb-3">Event Details</th>
-                  <th className="pb-3 text-right">Source IP</th>
+                  <th className="py-3 px-4">Event Ref</th>
+                  <th className="py-3 px-4">Timestamp</th>
+                  <th className="py-3 px-4">Staff Member</th>
+                  <th className="py-3 px-4">Action</th>
+                  <th className="py-3 px-4">Target</th>
+                  <th className="py-3 px-4">Event Details</th>
+                  <th className="py-3 px-4 text-right">Source IP</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 font-medium">
+              <tbody className="divide-y divide-slate-100 font-medium">
                 {filtered.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-800/40 transition">
-                    <td className="py-3 font-mono font-bold text-blue-400">{log.id}</td>
-                    <td className="py-3 text-slate-400 text-[11px]">
+                  <tr key={log.id} className="hover:bg-slate-50/80 transition">
+                    <td className="py-3 px-4 font-mono font-bold text-blue-600">{log.id}</td>
+                    <td className="py-3 px-4 text-slate-500 text-[11px] whitespace-nowrap">
                       {new Date(log.timestamp).toLocaleString('en-IN')}
                     </td>
-                    <td className="py-3">
-                      <div className="text-white font-semibold">{log.username}</div>
-                      <div className="text-[10px] text-slate-400 uppercase font-mono">{log.role}</div>
+                    <td className="py-3 px-4">
+                      <div className="text-slate-900 font-bold">{log.username}</div>
+                      <div className="text-[10px] text-slate-500 uppercase font-mono">{log.role}</div>
                     </td>
-                    <td className="py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-wider ${getActionBadge(log.action)}`}>
+                    <td className="py-3 px-4">
+                      <span
+                        className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border uppercase tracking-wider ${getActionBadge(
+                          log.action
+                        )}`}
+                      >
                         {log.action}
                       </span>
                     </td>
-                    <td className="py-3 font-mono text-slate-300 text-[11px]">
+                    <td className="py-3 px-4 font-mono text-slate-700 text-[11px] whitespace-nowrap">
                       {log.targetType}:{log.targetId}
                     </td>
-                    <td className="py-3 text-slate-300 max-w-sm truncate" title={log.details}>
+                    <td className="py-3 px-4 text-slate-700 max-w-sm truncate" title={log.details}>
                       {log.details}
                     </td>
-                    <td className="py-3 text-right font-mono text-slate-500 text-[11px]">
+                    <td className="py-3 px-4 text-right font-mono text-slate-500 text-[11px]">
                       {log.ip}
                     </td>
                   </tr>
