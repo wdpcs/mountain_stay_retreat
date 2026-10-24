@@ -242,7 +242,7 @@ export default function AdminApp() {
     { id: 'bookings', label: 'Bookings', icon: '📋', count: bookings.length },
     { id: 'inventory', label: 'Inventory & Rates', icon: '🛏️' },
     { id: 'calendar', label: 'Calendar', icon: '🗓️' },
-    { id: 'guests', label: 'Guest Records', icon: '👥' },
+    { id: 'guests', label: 'Guest Directory', icon: '👥' },
     { id: 'payments', label: 'Transactions', icon: '💳' },
     { id: 'refunds', label: 'Cancellations', icon: '🔄' },
     { id: 'reports', label: 'Reports & Manifest', icon: '📈' },
@@ -252,47 +252,47 @@ export default function AdminApp() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950 font-sans text-slate-100 flex flex-col antialiased">
-      {/* Top Main Navigation Bar */}
-      <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/95 backdrop-blur-md px-6 py-3.5">
+    <div className="min-h-screen bg-slate-100/70 font-sans text-slate-800 flex flex-col antialiased">
+      {/* Top Header Bar */}
+      <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-md px-4 sm:px-6 py-3 shadow-xs">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
-          {/* Logo & Entity Details */}
+          {/* Logo & Society Info */}
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-500 text-2xl text-white shadow-lg shadow-blue-500/20 border border-blue-400/30">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-2xl text-white shadow-md shadow-blue-500/20">
               🛡️
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-extrabold tracking-tight text-white">
+                <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-slate-900">
                   Mountain Stay Retreat
                 </h1>
-                <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold text-blue-400 border border-blue-500/20">
-                  ADMIN PORTAL
+                <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-extrabold text-blue-700 border border-blue-200">
+                  ADMIN CONSOLE
                 </span>
               </div>
-              <p className="text-[11px] font-medium text-slate-400 hidden sm:block">
+              <p className="text-[11px] font-medium text-slate-500 hidden sm:block">
                 Wayanad District Police Co-operative Society Ltd. No. W 208
               </p>
             </div>
           </div>
 
-          {/* Right Header: Notification Alert, Staff Chip, Logout */}
-          <div className="flex items-center gap-3">
+          {/* Right Header Actions */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
             {/* Notifications Button */}
             <div className="relative">
               <button
                 onClick={() => setIsNotifOpen((prev) => !prev)}
                 className={`relative flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition ${
                   unreadCount > 0
-                    ? 'border-blue-500/60 bg-blue-900/40 text-blue-200 hover:bg-blue-900/60 shadow-lg shadow-blue-950/50'
-                    : 'border-slate-800 bg-slate-900 text-slate-300 hover:bg-slate-800'
+                    ? 'border-blue-300 bg-blue-50 text-blue-700 shadow-xs'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                 }`}
                 title="Booking Alerts"
               >
                 <span>🔔</span>
                 <span className="hidden sm:inline">Alerts</span>
                 {unreadCount > 0 && (
-                  <span className="rounded-full bg-rose-500 px-1.5 py-0.2 text-[10px] font-extrabold text-white animate-pulse">
+                  <span className="rounded-full bg-rose-600 px-1.5 py-0.2 text-[10px] font-extrabold text-white">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
@@ -300,13 +300,13 @@ export default function AdminApp() {
 
               {/* Notifications Dropdown */}
               {isNotifOpen && (
-                <div className="absolute right-0 mt-3 w-80 sm:w-96 rounded-3xl border border-slate-700 bg-slate-950 p-4 text-slate-100 shadow-2xl z-50">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+                <div className="absolute right-0 mt-3 w-80 sm:w-96 rounded-3xl border border-slate-200 bg-white p-4 text-slate-800 shadow-2xl z-50">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
                     <div className="flex items-center gap-2">
                       <span>🔔</span>
-                      <h4 className="font-bold text-xs text-white">Booking Notifications</h4>
+                      <h4 className="font-bold text-xs text-slate-900">Booking Notifications</h4>
                       {unreadCount > 0 && (
-                        <span className="rounded-full bg-blue-500/20 text-blue-300 px-2 py-0.5 text-[10px] font-bold">
+                        <span className="rounded-full bg-blue-100 text-blue-800 px-2 py-0.5 text-[10px] font-bold">
                           {unreadCount} unread
                         </span>
                       )}
@@ -314,7 +314,7 @@ export default function AdminApp() {
                     {unreadCount > 0 && (
                       <button
                         onClick={handleMarkAllNotificationsRead}
-                        className="text-[11px] text-blue-400 hover:underline"
+                        className="text-[11px] font-semibold text-blue-600 hover:underline"
                       >
                         Mark all read
                       </button>
@@ -323,7 +323,7 @@ export default function AdminApp() {
 
                   <div className="max-h-72 overflow-y-auto space-y-2">
                     {notifications.length === 0 ? (
-                      <p className="text-center text-xs text-slate-500 py-6">
+                      <p className="text-center text-xs text-slate-400 py-6 font-medium">
                         No notifications received.
                       </p>
                     ) : (
@@ -337,18 +337,18 @@ export default function AdminApp() {
                           }}
                           className={`rounded-2xl p-3 text-xs transition cursor-pointer border ${
                             n.read
-                              ? 'border-slate-800/60 bg-slate-900/40 opacity-75'
-                              : 'border-blue-500/40 bg-blue-950/30'
+                              ? 'border-slate-100 bg-slate-50 opacity-75'
+                              : 'border-blue-200 bg-blue-50/60'
                           }`}
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <strong className="font-semibold text-white">{n.title}</strong>
+                            <strong className="font-bold text-slate-900">{n.title}</strong>
                             {!n.read && (
-                              <span className="h-2 w-2 rounded-full bg-blue-400 shrink-0 mt-1"></span>
+                              <span className="h-2 w-2 rounded-full bg-blue-600 shrink-0 mt-1"></span>
                             )}
                           </div>
-                          <p className="mt-1 text-[11px] text-slate-300">{n.message}</p>
-                          <div className="mt-2 text-[10px] text-slate-500">
+                          <p className="mt-1 text-[11px] text-slate-600 leading-relaxed">{n.message}</p>
+                          <div className="mt-2 text-[10px] text-slate-400 font-mono">
                             {new Date(n.createdAt).toLocaleTimeString()}
                           </div>
                         </div>
@@ -360,13 +360,13 @@ export default function AdminApp() {
             </div>
 
             {/* Current Staff User Chip */}
-            <div className="hidden md:flex items-center gap-2.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5">
-              <div className="h-7 w-7 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center text-xs font-bold font-mono">
+            <div className="hidden md:flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 shadow-2xs">
+              <div className="h-7 w-7 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center text-xs font-bold font-mono">
                 {currentUser.username.slice(0, 2).toUpperCase()}
               </div>
               <div className="text-left">
-                <div className="text-xs font-bold text-white leading-none">{currentUser.name}</div>
-                <div className="text-[10px] text-slate-400 font-mono capitalize leading-tight mt-0.5">
+                <div className="text-xs font-bold text-slate-900 leading-none">{currentUser.name}</div>
+                <div className="text-[10px] text-slate-500 font-mono capitalize leading-tight mt-0.5">
                   {currentUser.role}
                 </div>
               </div>
@@ -377,7 +377,7 @@ export default function AdminApp() {
               href="https://rooms.wdpcs.in"
               target="_blank"
               rel="noreferrer"
-              className="hidden lg:flex items-center gap-1 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 transition"
+              className="hidden lg:flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:text-blue-600 hover:bg-slate-50 transition shadow-2xs"
               title="Open public guest booking site"
             >
               <span>🌐</span>
@@ -387,7 +387,7 @@ export default function AdminApp() {
             {/* Sign Out Button */}
             <button
               onClick={handleLogout}
-              className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs font-bold text-rose-300 hover:bg-rose-500 hover:text-white transition flex items-center gap-1.5"
+              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-600 hover:text-white transition flex items-center gap-1.5"
             >
               <span>🚪</span>
               <span className="hidden sm:inline">Sign Out</span>
@@ -396,127 +396,128 @@ export default function AdminApp() {
         </div>
       </header>
 
-      {/* Real-time Toast Alert */}
-      {toastAlert && (
-        <div className="fixed top-20 right-6 z-50 w-80 sm:w-96 rounded-3xl border border-emerald-500/50 bg-slate-900 p-4 text-white shadow-2xl animate-bounce">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🎉</span>
-              <strong className="text-xs font-bold text-emerald-400">New Booking Alert!</strong>
-            </div>
-            <button
-              onClick={() => setToastAlert(null)}
-              className="text-xs text-slate-400 hover:text-white"
-            >
-              ✕
-            </button>
-          </div>
-          <p className="mt-1 text-xs text-slate-200">{toastAlert.message}</p>
-        </div>
-      )}
-
-      {/* Main Container */}
-      <div className="mx-auto flex-1 max-w-7xl w-full px-4 sm:px-6 py-6 space-y-6">
-        {/* Navigation Tabs Bar */}
-        <nav className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none border-b border-slate-800/80">
+      {/* Prominent Secondary Navigation Bar (Visible on all tabs) */}
+      <nav className="sticky top-[57px] sm:top-[65px] z-30 border-b border-slate-200 bg-white px-4 sm:px-6 py-2 shadow-xs">
+        <div className="mx-auto max-w-7xl flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
           {navItems.map((item) => {
             const isActive = activeTab === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`whitespace-nowrap rounded-2xl px-3.5 py-2 text-xs font-bold transition flex items-center gap-1.5 ${
+                className={`whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-bold transition flex items-center gap-1.5 shrink-0 ${
                   isActive
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-600/20'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-slate-50/70 border border-slate-200/60'
                 }`}
               >
                 <span>{item.icon}</span>
                 <span>{item.label}</span>
                 {item.count !== undefined && (
-                  <span className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] ${
-                    isActive ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-400'
-                  }`}>
+                  <span
+                    className={`ml-1 rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
+                      isActive ? 'bg-white/25 text-white' : 'bg-slate-200 text-slate-700'
+                    }`}
+                  >
                     {item.count}
                   </span>
                 )}
               </button>
             );
           })}
-        </nav>
+        </div>
+      </nav>
 
-        {/* Tab Content Rendering */}
-        <main>
-          {activeTab === 'overview' && (
-            <DashboardOverview
-              stats={stats}
-              onNavigate={setActiveTab}
-              onOpenWalkIn={() => setIsWalkInOpen(true)}
-              onStatusChange={handleStatusChange}
-            />
-          )}
+      {/* Real-time Toast Alert */}
+      {toastAlert && (
+        <div className="fixed top-28 right-6 z-50 w-80 sm:w-96 rounded-3xl border border-emerald-300 bg-white p-4 text-slate-800 shadow-2xl border-l-4 border-l-emerald-500 animate-bounce">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🎉</span>
+              <strong className="text-xs font-bold text-emerald-800">New Booking Alert!</strong>
+            </div>
+            <button
+              onClick={() => setToastAlert(null)}
+              className="text-xs text-slate-400 hover:text-slate-700"
+            >
+              ✕
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-slate-600 leading-relaxed">{toastAlert.message}</p>
+        </div>
+      )}
 
-          {activeTab === 'bookings' && (
-            <BookingManagement
-              bookings={bookings}
-              token={token}
-              onRefresh={fetchBookings}
-              onOpenWalkIn={() => setIsWalkInOpen(true)}
-              onStatusChange={handleStatusChange}
-              onDeleteBooking={handleDeleteBooking}
-            />
-          )}
+      {/* Main Content Area */}
+      <main className="mx-auto flex-1 max-w-7xl w-full px-4 sm:px-6 py-6">
+        {activeTab === 'overview' && (
+          <DashboardOverview
+            stats={stats}
+            onNavigate={setActiveTab}
+            onOpenWalkIn={() => setIsWalkInOpen(true)}
+            onStatusChange={handleStatusChange}
+          />
+        )}
 
-          {activeTab === 'inventory' && (
-            <RoomInventory
-              token={token}
-              onPricesUpdated={() => {
-                fetchStats();
-                fetchBookings();
-              }}
-            />
-          )}
+        {activeTab === 'bookings' && (
+          <BookingManagement
+            bookings={bookings}
+            token={token}
+            onRefresh={fetchBookings}
+            onOpenWalkIn={() => setIsWalkInOpen(true)}
+            onStatusChange={handleStatusChange}
+            onDeleteBooking={handleDeleteBooking}
+          />
+        )}
 
-          {activeTab === 'calendar' && (
-            <AvailabilityCalendar token={token} />
-          )}
+        {activeTab === 'inventory' && (
+          <RoomInventory
+            token={token}
+            onPricesUpdated={() => {
+              fetchStats();
+              fetchBookings();
+            }}
+          />
+        )}
 
-          {activeTab === 'guests' && (
-            <GuestDirectory token={token} />
-          )}
+        {activeTab === 'calendar' && (
+          <AvailabilityCalendar token={token} />
+        )}
 
-          {activeTab === 'payments' && (
-            <PaymentMonitor token={token} />
-          )}
+        {activeTab === 'guests' && (
+          <GuestDirectory token={token} />
+        )}
 
-          {activeTab === 'refunds' && (
-            <CancellationsRefunds
-              token={token}
-              bookings={bookings}
-              onRefreshBookings={() => {
-                fetchBookings();
-                fetchStats();
-              }}
-            />
-          )}
+        {activeTab === 'payments' && (
+          <PaymentMonitor token={token} />
+        )}
 
-          {activeTab === 'reports' && (
-            <ReportsExports token={token} />
-          )}
+        {activeTab === 'refunds' && (
+          <CancellationsRefunds
+            token={token}
+            bookings={bookings}
+            onRefreshBookings={() => {
+              fetchBookings();
+              fetchStats();
+            }}
+          />
+        )}
 
-          {activeTab === 'users' && (
-            <UserManagement token={token} currentUser={currentUser} />
-          )}
+        {activeTab === 'reports' && (
+          <ReportsExports token={token} />
+        )}
 
-          {activeTab === 'audit' && (
-            <AuditLogs token={token} />
-          )}
+        {activeTab === 'users' && (
+          <UserManagement token={token} currentUser={currentUser} />
+        )}
 
-          {activeTab === 'settings' && (
-            <AdminSettings token={token} currentUser={currentUser} />
-          )}
-        </main>
-      </div>
+        {activeTab === 'audit' && (
+          <AuditLogs token={token} />
+        )}
+
+        {activeTab === 'settings' && (
+          <AdminSettings token={token} currentUser={currentUser} />
+        )}
+      </main>
 
       {/* Front Desk Walk-In Booking Modal */}
       <WalkInBookingModal
@@ -531,11 +532,11 @@ export default function AdminApp() {
       />
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500">
+      <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500 mt-auto">
         <div className="mx-auto max-w-7xl px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>{SOCIETY_INFO.name}</span>
-          <span className="font-mono text-[11px] text-slate-600">
-            Secure Admin Session • TLS Encrypted • Role: {currentUser.role}
+          <span className="font-medium text-slate-700">{SOCIETY_INFO.name}</span>
+          <span className="font-mono text-[11px] text-slate-500">
+            Secure Admin Session • TLS Encrypted • Active Role: {currentUser.role}
           </span>
         </div>
       </footer>

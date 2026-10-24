@@ -42,149 +42,127 @@ export default function AdminLogin({ onLoginSuccess }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background glow effects */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Background soft ambient accents */}
+      <div className="absolute -top-40 -left-40 w-96 h-96 bg-blue-200/50 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-indigo-200/50 rounded-full blur-3xl pointer-events-none"></div>
 
       <div className="w-full max-w-lg z-10">
         {/* Entity Header Banner */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-500 shadow-xl shadow-blue-500/20 text-3xl mb-3 border border-blue-400/30">
+          <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 shadow-xl shadow-blue-500/20 text-3xl mb-3 text-white">
             🛡️
           </div>
-          <h2 className="text-xs font-bold uppercase tracking-wider text-blue-400">
+          <h2 className="text-xs font-extrabold uppercase tracking-wider text-blue-700">
             Wayanad District Police Co-operative Society Ltd. No. W 208
           </h2>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">
             Mountain Stay Retreat
           </h1>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-600 mt-1 font-medium">
             Administrative Management Portal & Accommodation Inventory Control
           </p>
         </div>
 
         {/* Login Card */}
-        <div className="rounded-3xl border border-slate-800 bg-slate-900/90 p-8 shadow-2xl backdrop-blur-xl">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+        <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
             <div>
-              <h3 className="text-lg font-bold text-white">Staff Sign In</h3>
-              <p className="text-xs text-slate-400">Authorised personnel access only</p>
+              <h3 className="text-lg font-bold text-slate-900">Staff Sign In</h3>
+              <p className="text-xs text-slate-500 font-medium">Authorised personnel access only</p>
             </div>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+              <span className="h-2 w-2 rounded-full bg-blue-600"></span>
               roomsadmin.wdpcs.in
             </span>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {errorMsg && (
-              <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-3.5 text-xs text-rose-300 font-medium flex items-start gap-2">
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-3.5 text-xs text-rose-800 font-semibold flex items-start gap-2">
                 <span className="text-base shrink-0">⚠️</span>
                 <span>{errorMsg}</span>
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
                 Staff Username
               </label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter username (e.g. admin)"
+                placeholder="Enter username"
                 required
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500 transition"
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter staff password"
-                  required
-                  className="w-full rounded-2xl border border-slate-800 bg-slate-950 px-4 py-3 text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500 transition"
-                />
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Password
+                </label>
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-3 text-xs font-medium text-slate-400 hover:text-slate-200"
+                  className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
                 >
                   {showPassword ? 'Hide' : 'Show'}
                 </button>
               </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                required
+                className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition"
+              />
             </div>
 
-            <div className="pt-2">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full rounded-2xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md shadow-blue-500/25 transition hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isSubmitting ? 'Authenticating...' : '🔐 Authenticate & Access Dashboard'}
+            </button>
+          </form>
+
+          {/* Quick Preset Buttons for local testing */}
+          <div className="mt-6 border-t border-slate-100 pt-5">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+              Quick Credential Presets (Staff Roles):
+            </p>
+            <div className="grid grid-cols-3 gap-2">
               <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3.5 font-bold text-sm text-white shadow-lg shadow-blue-600/30 transition hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 flex items-center justify-center gap-2"
+                type="button"
+                onClick={() => setPreset('admin', 'admin123')}
+                className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-center hover:bg-slate-100 transition"
               >
-                {isSubmitting ? (
-                  <>
-                    <span className="h-4 w-4 rounded-full border-2 border-white/20 border-t-white animate-spin"></span>
-                    <span>Verifying Credentials...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>🔐</span>
-                    <span>Authenticate & Access Dashboard</span>
-                  </>
-                )}
+                <span className="block text-xs font-bold text-slate-800">Super Admin</span>
+                <span className="block text-[10px] text-slate-500 font-mono">admin</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreset('manager', 'manager123')}
+                className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-center hover:bg-slate-100 transition"
+              >
+                <span className="block text-xs font-bold text-slate-800">Manager</span>
+                <span className="block text-[10px] text-slate-500 font-mono">manager</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreset('reception', 'reception123')}
+                className="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-center hover:bg-slate-100 transition"
+              >
+                <span className="block text-xs font-bold text-slate-800">Front Desk</span>
+                <span className="block text-[10px] text-slate-500 font-mono">reception</span>
               </button>
             </div>
-
-            {/* Quick Demo Credentials */}
-            <div className="pt-4 border-t border-slate-800">
-              <p className="text-[11px] font-semibold text-slate-400 mb-2">
-                Quick Credential Presets (Staff Roles):
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setPreset('admin', 'admin123')}
-                  className="rounded-xl border border-slate-800 bg-slate-950/80 p-2 text-left hover:border-blue-500/50 transition group"
-                >
-                  <p className="text-[11px] font-bold text-slate-200 group-hover:text-blue-400">Super Admin</p>
-                  <p className="text-[10px] text-slate-500 font-mono">admin</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreset('manager', 'manager123')}
-                  className="rounded-xl border border-slate-800 bg-slate-950/80 p-2 text-left hover:border-blue-500/50 transition group"
-                >
-                  <p className="text-[11px] font-bold text-slate-200 group-hover:text-blue-400">Manager</p>
-                  <p className="text-[10px] text-slate-500 font-mono">manager</p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPreset('reception', 'reception123')}
-                  className="rounded-xl border border-slate-800 bg-slate-950/80 p-2 text-left hover:border-blue-500/50 transition group"
-                >
-                  <p className="text-[11px] font-bold text-slate-200 group-hover:text-blue-400">Front Desk</p>
-                  <p className="text-[10px] text-slate-500 font-mono">reception</p>
-                </button>
-              </div>
-            </div>
-          </form>
-        </div>
-
-        {/* Security Notice Footer */}
-        <div className="mt-6 text-center text-xs text-slate-500 space-y-1">
-          <p>
-            🔒 All administrative actions are recorded in immutable audit logs.
-          </p>
-          <p>
-            Guest booking site: <a href="https://rooms.wdpcs.in" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">rooms.wdpcs.in</a>
-          </p>
+          </div>
         </div>
       </div>
     </div>

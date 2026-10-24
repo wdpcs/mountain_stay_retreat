@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { API_BASE_URL } from '../config';
 
-export default function WalkInBookingModal({ isOpen, onClose, token, onBookingCreated, prices }) {
+export default function WalkInBookingModal({ isOpen, onClose, token, prices, onBookingCreated }) {
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [email, setEmail] = useState('');
+  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [roomType, setRoomType] = useState('Suite Room (₹2,500/night)');
   const [paymentMethod, setPaymentMethod] = useState('Cash at Counter');
   const [status, setStatus] = useState('Paid at Counter');
@@ -16,8 +16,8 @@ export default function WalkInBookingModal({ isOpen, onClose, token, onBookingCr
   if (!isOpen) return null;
 
   const currentPrice = roomType.includes('Dormitory')
-    ? prices?.dormPrice || 450
-    : prices?.suitePrice || 2500;
+    ? (prices?.dormPrice || 450)
+    : (prices?.suitePrice || 2500);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,20 +33,19 @@ export default function WalkInBookingModal({ isOpen, onClose, token, onBookingCr
         },
         body: JSON.stringify({
           name: name.trim(),
-          email: email.trim().toLowerCase(),
           phone: phone.trim(),
+          email: email.trim() || `${phone.replace(/\D/g, '')}@walkin.wdpcs.in`,
           date,
           roomType,
-          amount: currentPrice,
           paymentMethod,
           status,
-          notes,
+          notes: notes.trim(),
         }),
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        onBookingCreated(data.booking);
+        onBookingCreated();
         onClose();
       } else {
         setErrorMsg(data.error || 'Failed to register walk-in booking.');
@@ -59,21 +58,21 @@ export default function WalkInBookingModal({ isOpen, onClose, token, onBookingCr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-3xl border border-slate-800 bg-slate-900 p-6 text-white shadow-2xl space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div>
-            <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider">
+            <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">
               Front Desk Reception
             </span>
-            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+            <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
               <span>🛎️</span>
               <span>New Walk-in Reservation</span>
             </h3>
           </div>
           <button
             onClick={onClose}
-            className="rounded-full p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+            className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
           >
             ✕
           </button>
@@ -81,67 +80,66 @@ export default function WalkInBookingModal({ isOpen, onClose, token, onBookingCr
 
         <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           {errorMsg && (
-            <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-rose-300">
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-rose-800 font-semibold">
               {errorMsg}
             </div>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Guest Full Name *</label>
+              <label className="block text-slate-700 font-bold mb-1">Guest Full Name *</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Guest name"
                 required
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-2.5 text-white outline-none focus:border-blue-500"
+                className="w-full rounded-2xl border border-slate-300 bg-white p-2.5 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 font-medium"
               />
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Contact Phone *</label>
+              <label className="block text-slate-700 font-bold mb-1">Contact Phone *</label>
               <input
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+91 98450 12345"
                 required
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-2.5 text-white outline-none focus:border-blue-500"
+                className="w-full rounded-2xl border border-slate-300 bg-white p-2.5 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 font-medium"
               />
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Email Address *</label>
+              <label className="block text-slate-700 font-bold mb-1">Email Address</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="guest@example.com"
-                required
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-2.5 text-white outline-none focus:border-blue-500"
+                placeholder="guest@example.com (optional)"
+                className="w-full rounded-2xl border border-slate-300 bg-white p-2.5 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 font-medium"
               />
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Check-in Date *</label>
+              <label className="block text-slate-700 font-bold mb-1">Check-in Date *</label>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 required
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-2 text-white outline-none focus:border-blue-500"
+                className="w-full rounded-2xl border border-slate-300 bg-white p-2 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 font-medium"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Accommodation Type</label>
+              <label className="block text-slate-700 font-bold mb-1">Accommodation Type</label>
               <select
                 value={roomType}
                 onChange={(e) => setRoomType(e.target.value)}
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-2.5 text-white outline-none focus:border-blue-500"
+                className="w-full rounded-2xl border border-slate-300 bg-white p-2.5 text-slate-900 outline-none focus:border-blue-600 font-medium"
               >
                 <option value="Suite Room (₹2,500/night)">Suite Room (₹{prices?.suitePrice || 2500}/night)</option>
                 <option value="Dormitory Bed (₹450/night)">Dormitory Bed (₹{prices?.dormPrice || 450}/night)</option>
@@ -149,8 +147,8 @@ export default function WalkInBookingModal({ isOpen, onClose, token, onBookingCr
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Total Due</label>
-              <div className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-2.5 text-emerald-400 font-extrabold text-sm">
+              <label className="block text-slate-700 font-bold mb-1">Total Due</label>
+              <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-emerald-700 font-extrabold text-sm">
                 ₹{currentPrice.toLocaleString('en-IN')}
               </div>
             </div>
@@ -158,11 +156,11 @@ export default function WalkInBookingModal({ isOpen, onClose, token, onBookingCr
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Payment Method</label>
+              <label className="block text-slate-700 font-bold mb-1">Payment Method</label>
               <select
                 value={paymentMethod}
                 onChange={(e) => setPaymentMethod(e.target.value)}
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-2.5 text-white outline-none focus:border-blue-500"
+                className="w-full rounded-2xl border border-slate-300 bg-white p-2.5 text-slate-900 outline-none focus:border-blue-600 font-medium"
               >
                 <option value="Cash at Counter">Cash at Counter</option>
                 <option value="UPI / QR Code at Desk">UPI / QR Code at Desk</option>
@@ -172,11 +170,11 @@ export default function WalkInBookingModal({ isOpen, onClose, token, onBookingCr
             </div>
 
             <div>
-              <label className="block text-slate-300 font-semibold mb-1">Initial Status</label>
+              <label className="block text-slate-700 font-bold mb-1">Initial Status</label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-2.5 text-white outline-none focus:border-blue-500"
+                className="w-full rounded-2xl border border-slate-300 bg-white p-2.5 text-slate-900 outline-none focus:border-blue-600 font-medium"
               >
                 <option value="Paid at Counter">Paid at Counter</option>
                 <option value="Checked In">Checked In (Key Handed Over)</option>
@@ -186,28 +184,28 @@ export default function WalkInBookingModal({ isOpen, onClose, token, onBookingCr
           </div>
 
           <div>
-            <label className="block text-slate-300 font-semibold mb-1">Receptionist Notes</label>
+            <label className="block text-slate-700 font-bold mb-1">Receptionist Notes</label>
             <input
               type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="e.g. Police society member discount applied, extra bedding provided..."
-              className="w-full rounded-2xl border border-slate-800 bg-slate-950 p-2.5 text-white placeholder-slate-500 outline-none focus:border-blue-500"
+              className="w-full rounded-2xl border border-slate-300 bg-white p-2.5 text-slate-900 placeholder-slate-400 outline-none focus:border-blue-600 font-medium"
             />
           </div>
 
-          <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-800">
+          <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-700 px-4 py-2 font-semibold text-slate-300 hover:bg-slate-800"
+              className="rounded-xl border border-slate-300 px-4 py-2 font-bold text-slate-700 hover:bg-slate-50 transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2 font-bold text-white shadow-lg shadow-blue-600/30 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50"
+              className="rounded-xl bg-blue-600 px-5 py-2 font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 transition disabled:opacity-50"
             >
               {isSubmitting ? 'Registering...' : 'Confirm Walk-In Booking'}
             </button>

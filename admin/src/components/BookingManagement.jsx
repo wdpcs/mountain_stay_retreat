@@ -42,19 +42,19 @@ export default function BookingManagement({
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Paid Online':
-        return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30';
+        return 'bg-emerald-50 text-emerald-800 border-emerald-300';
       case 'Paid at Counter':
-        return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+        return 'bg-blue-50 text-blue-800 border-blue-300';
       case 'Checked In':
-        return 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30';
+        return 'bg-indigo-50 text-indigo-800 border-indigo-300';
       case 'Checked Out':
-        return 'bg-slate-500/20 text-slate-300 border-slate-500/30';
+        return 'bg-slate-100 text-slate-700 border-slate-300';
       case 'Pending at Check-in':
-        return 'bg-amber-500/20 text-amber-300 border-amber-500/30';
+        return 'bg-amber-50 text-amber-800 border-amber-300';
       case 'Cancelled':
-        return 'bg-rose-500/20 text-rose-300 border-rose-500/30';
+        return 'bg-rose-50 text-rose-800 border-rose-300';
       default:
-        return 'bg-slate-700 text-slate-200 border-slate-600';
+        return 'bg-slate-100 text-slate-700 border-slate-300';
     }
   };
 
@@ -137,21 +137,21 @@ export default function BookingManagement({
   return (
     <div className="space-y-6">
       {/* Controls Bar */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl">
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-xs">
         {/* Search */}
         <div className="relative flex-1">
-          <span className="absolute left-4 top-3 text-sm text-slate-500">🔍</span>
+          <span className="absolute left-4 top-3 text-sm text-slate-400">🔍</span>
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder="Search bookings by ID, guest name, phone, or email..."
-            className="w-full rounded-2xl border border-slate-800 bg-slate-950 py-2.5 pl-11 pr-4 text-xs text-white placeholder-slate-500 outline-none focus:border-blue-500 transition"
+            className="w-full rounded-2xl border border-slate-300 bg-white py-2.5 pl-11 pr-4 text-xs text-slate-900 placeholder-slate-400 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition font-medium"
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm('')}
-              className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-white"
+              className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-slate-700"
             >
               ✕
             </button>
@@ -164,7 +164,7 @@ export default function BookingManagement({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-300 outline-none focus:border-blue-500"
+            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-600 shadow-2xs cursor-pointer"
           >
             <option value="All">All Statuses</option>
             <option value="Paid Online">Paid Online</option>
@@ -179,7 +179,7 @@ export default function BookingManagement({
           <select
             value={roomFilter}
             onChange={(e) => setRoomFilter(e.target.value)}
-            className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-300 outline-none focus:border-blue-500"
+            className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-600 shadow-2xs cursor-pointer"
           >
             <option value="All">All Rooms</option>
             <option value="Suite">Suites</option>
@@ -191,12 +191,12 @@ export default function BookingManagement({
             type="date"
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="rounded-xl border border-slate-800 bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-300 outline-none focus:border-blue-500"
+            className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-600 shadow-2xs"
           />
           {dateFilter && (
             <button
               onClick={() => setDateFilter('')}
-              className="text-xs text-slate-400 hover:text-white underline"
+              className="text-xs text-blue-600 hover:text-blue-800 font-bold underline"
             >
               Clear Date
             </button>
@@ -205,7 +205,7 @@ export default function BookingManagement({
           {/* Action: Walk In */}
           <button
             onClick={onOpenWalkIn}
-            className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:from-blue-500 hover:to-indigo-500 transition flex items-center gap-1.5"
+            className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700 transition flex items-center gap-1.5"
           >
             <span>➕</span>
             <span>Walk-In Booking</span>
@@ -214,69 +214,69 @@ export default function BookingManagement({
       </div>
 
       {/* Bookings Table */}
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-6 shadow-xl">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <h3 className="text-base font-bold text-white">All Bookings Roster</h3>
-            <span className="rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-300">
+            <h3 className="text-base font-extrabold text-slate-900">All Bookings Roster</h3>
+            <span className="rounded-full bg-slate-100 border border-slate-200 px-2.5 py-0.5 text-xs font-bold text-slate-700">
               {filtered.length} of {bookings.length}
             </span>
           </div>
           <button
             onClick={onRefresh}
-            className="text-xs text-slate-400 hover:text-white flex items-center gap-1"
+            className="text-xs font-bold text-blue-600 hover:text-blue-800 flex items-center gap-1"
           >
             <span>🔄</span> Refresh Roster
           </button>
         </div>
 
         {filtered.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-800 p-12 text-center text-slate-500 text-xs">
+          <div className="rounded-2xl border border-dashed border-slate-200 p-12 text-center text-slate-500 text-xs font-medium">
             No bookings match the specified filters. Try clearing your search or filters.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-800 text-slate-400 font-semibold">
+              <thead className="border-b border-slate-200 bg-slate-50/70 text-slate-600 font-bold">
                 <tr>
-                  <th className="pb-3">Reference</th>
-                  <th className="pb-3">Guest</th>
-                  <th className="pb-3">Check-in Date</th>
-                  <th className="pb-3">Accommodation</th>
-                  <th className="pb-3">Amount</th>
-                  <th className="pb-3">Payment Method</th>
-                  <th className="pb-3">Status</th>
-                  <th className="pb-3 text-right">Actions</th>
+                  <th className="py-3 px-3">Reference</th>
+                  <th className="py-3 px-3">Guest</th>
+                  <th className="py-3 px-3">Check-in Date</th>
+                  <th className="py-3 px-3">Accommodation</th>
+                  <th className="py-3 px-3">Amount</th>
+                  <th className="py-3 px-3">Payment Method</th>
+                  <th className="py-3 px-3">Status</th>
+                  <th className="py-3 px-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 font-medium">
+              <tbody className="divide-y divide-slate-100 font-medium">
                 {filtered.map((b) => (
-                  <tr key={b.id} className="hover:bg-slate-800/40 transition">
-                    <td className="py-3.5">
+                  <tr key={b.id} className="hover:bg-slate-50/80 transition">
+                    <td className="py-3.5 px-3">
                       <button
                         onClick={() => setSelectedBooking(b)}
-                        className="font-mono font-bold text-blue-400 hover:underline text-left"
+                        className="font-mono font-bold text-blue-700 hover:underline text-left"
                       >
                         {b.id}
                       </button>
                     </td>
-                    <td className="py-3.5">
-                      <div className="text-white font-semibold">{b.name}</div>
-                      <div className="text-[11px] text-slate-400">{b.phone || b.email}</div>
+                    <td className="py-3.5 px-3">
+                      <div className="text-slate-900 font-bold">{b.name}</div>
+                      <div className="text-[11px] text-slate-500 font-medium">{b.phone || b.email}</div>
                     </td>
-                    <td className="py-3.5 text-slate-200">{b.date}</td>
-                    <td className="py-3.5 text-slate-300">{b.roomType}</td>
-                    <td className="py-3.5 font-bold text-white">
+                    <td className="py-3.5 px-3 text-slate-700 font-semibold">{b.date}</td>
+                    <td className="py-3.5 px-3 text-slate-700">{b.roomType}</td>
+                    <td className="py-3.5 px-3 font-extrabold text-slate-900">
                       ₹{(b.amount || 0).toLocaleString('en-IN')}
                     </td>
-                    <td className="py-3.5 text-slate-400 text-[11px]">
+                    <td className="py-3.5 px-3 text-slate-600 text-[11px]">
                       {b.paymentMethod}
                     </td>
-                    <td className="py-3.5">
+                    <td className="py-3.5 px-3">
                       <select
                         value={b.status}
                         onChange={(e) => onStatusChange(b.id, e.target.value)}
-                        className={`rounded-lg px-2 py-1 text-[11px] font-bold border outline-none bg-slate-950 ${getStatusBadge(
+                        className={`rounded-lg px-2.5 py-1 text-[11px] font-bold border outline-none bg-white shadow-2xs ${getStatusBadge(
                           b.status
                         )}`}
                       >
@@ -288,25 +288,25 @@ export default function BookingManagement({
                         <option value="Cancelled">Cancelled</option>
                       </select>
                     </td>
-                    <td className="py-3.5 text-right space-x-1.5">
+                    <td className="py-3.5 px-3 text-right space-x-1.5">
                       <button
                         onClick={() => setSelectedBooking(b)}
                         title="View Details"
-                        className="rounded-lg bg-slate-800 p-1.5 text-slate-300 hover:bg-slate-700 hover:text-white transition"
+                        className="rounded-lg bg-slate-100 p-1.5 text-slate-700 hover:bg-slate-200 transition border border-slate-200"
                       >
                         👁️
                       </button>
                       <button
                         onClick={() => handlePrintVoucher(b)}
                         title="Print Receipt Voucher"
-                        className="rounded-lg bg-slate-800 p-1.5 text-slate-300 hover:bg-slate-700 hover:text-white transition"
+                        className="rounded-lg bg-slate-100 p-1.5 text-slate-700 hover:bg-slate-200 transition border border-slate-200"
                       >
                         🖨️
                       </button>
                       <button
                         onClick={() => setDeleteConfirmId(b.id)}
                         title="Delete Record"
-                        className="rounded-lg bg-rose-500/10 p-1.5 text-rose-400 hover:bg-rose-500 hover:text-white transition border border-rose-500/20"
+                        className="rounded-lg bg-rose-50 p-1.5 text-rose-700 hover:bg-rose-600 hover:text-white transition border border-rose-200"
                       >
                         🗑️
                       </button>
@@ -321,19 +321,19 @@ export default function BookingManagement({
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-3xl border border-slate-800 bg-slate-900 p-6 text-white shadow-2xl">
-            <h4 className="text-base font-bold text-white flex items-center gap-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl">
+            <h4 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <span>⚠️</span>
               <span>Confirm Record Deletion</span>
             </h4>
-            <p className="mt-2 text-xs text-slate-400">
-              Are you sure you want to remove booking <span className="font-mono text-blue-400">{deleteConfirmId}</span>? This action is recorded in the audit log.
+            <p className="mt-2 text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to remove booking <span className="font-mono font-bold text-blue-700">{deleteConfirmId}</span>? This action is recorded in the audit log.
             </p>
             <div className="mt-5 flex items-center justify-end gap-2">
               <button
                 onClick={() => setDeleteConfirmId(null)}
-                className="rounded-xl border border-slate-700 px-4 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800"
+                className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
               >
                 Cancel
               </button>
@@ -342,7 +342,7 @@ export default function BookingManagement({
                   onDeleteBooking(deleteConfirmId);
                   setDeleteConfirmId(null);
                 }}
-                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-500"
+                className="rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white hover:bg-rose-700 transition shadow-sm"
               >
                 Yes, Delete
               </button>
@@ -353,65 +353,65 @@ export default function BookingManagement({
 
       {/* Booking Details Drawer / Modal */}
       {selectedBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-3xl border border-slate-800 bg-slate-900 p-6 text-white shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <span className="text-[11px] font-bold text-blue-400 uppercase tracking-wider">
+                <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">
                   Reservation Details
                 </span>
-                <h3 className="text-lg font-bold text-white font-mono">{selectedBooking.id}</h3>
+                <h3 className="text-lg font-extrabold text-slate-900 font-mono">{selectedBooking.id}</h3>
               </div>
               <button
                 onClick={() => setSelectedBooking(null)}
-                className="rounded-full p-2 text-slate-400 hover:bg-slate-800 hover:text-white"
+                className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
               >
                 ✕
               </button>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3">
-                <span className="text-slate-400 block text-[10px] font-bold uppercase">Guest Full Name</span>
-                <span className="text-white font-semibold text-sm">{selectedBooking.name}</span>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <span className="text-slate-500 block text-[10px] font-bold uppercase">Guest Full Name</span>
+                <span className="text-slate-900 font-bold text-sm">{selectedBooking.name}</span>
               </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3">
-                <span className="text-slate-400 block text-[10px] font-bold uppercase">Contact Phone</span>
-                <span className="text-white font-semibold text-sm">{selectedBooking.phone || 'N/A'}</span>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <span className="text-slate-500 block text-[10px] font-bold uppercase">Contact Phone</span>
+                <span className="text-slate-900 font-bold text-sm">{selectedBooking.phone || 'N/A'}</span>
               </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3">
-                <span className="text-slate-400 block text-[10px] font-bold uppercase">Email Address</span>
-                <span className="text-white font-semibold">{selectedBooking.email || 'N/A'}</span>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <span className="text-slate-500 block text-[10px] font-bold uppercase">Email Address</span>
+                <span className="text-slate-800 font-semibold">{selectedBooking.email || 'N/A'}</span>
               </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3">
-                <span className="text-slate-400 block text-[10px] font-bold uppercase">Check-in Date</span>
-                <span className="text-white font-semibold">{selectedBooking.date}</span>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <span className="text-slate-500 block text-[10px] font-bold uppercase">Check-in Date</span>
+                <span className="text-slate-800 font-semibold">{selectedBooking.date}</span>
               </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3 col-span-2">
-                <span className="text-slate-400 block text-[10px] font-bold uppercase">Accommodation Type</span>
-                <span className="text-white font-semibold">{selectedBooking.roomType}</span>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 col-span-2">
+                <span className="text-slate-500 block text-[10px] font-bold uppercase">Accommodation Type</span>
+                <span className="text-slate-800 font-semibold">{selectedBooking.roomType}</span>
               </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3">
-                <span className="text-slate-400 block text-[10px] font-bold uppercase">Payment Status</span>
-                <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadge(selectedBooking.status)}`}>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <span className="text-slate-500 block text-[10px] font-bold uppercase">Payment Status</span>
+                <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${getStatusBadge(selectedBooking.status)}`}>
                   {selectedBooking.status}
                 </span>
               </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3">
-                <span className="text-slate-400 block text-[10px] font-bold uppercase">Total Amount</span>
-                <span className="text-emerald-400 font-extrabold text-base">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <span className="text-slate-500 block text-[10px] font-bold uppercase">Total Amount</span>
+                <span className="text-emerald-700 font-extrabold text-base">
                   ₹{(selectedBooking.amount || 0).toLocaleString('en-IN')}
                 </span>
               </div>
               {selectedBooking.notes && (
-                <div className="rounded-2xl border border-slate-800 bg-slate-950 p-3 col-span-2">
-                  <span className="text-slate-400 block text-[10px] font-bold uppercase">Staff Notes</span>
-                  <span className="text-slate-300">{selectedBooking.notes}</span>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 col-span-2">
+                  <span className="text-slate-500 block text-[10px] font-bold uppercase">Staff Notes</span>
+                  <span className="text-slate-700">{selectedBooking.notes}</span>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
               {selectedBooking.phone && (
                 <a
                   href={`https://wa.me/${selectedBooking.phone.replace(/\D/g, '')}?text=${encodeURIComponent(
@@ -419,14 +419,14 @@ export default function BookingManagement({
                   )}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-500 transition flex items-center gap-1.5"
+                  className="rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition flex items-center gap-1.5 shadow-xs"
                 >
                   <span>💬</span> WhatsApp Guest
                 </a>
               )}
               <button
                 onClick={() => handlePrintVoucher(selectedBooking)}
-                className="rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-500 transition flex items-center gap-1.5"
+                className="rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-blue-700 transition flex items-center gap-1.5 shadow-xs"
               >
                 <span>🖨️</span> Print Folio
               </button>
