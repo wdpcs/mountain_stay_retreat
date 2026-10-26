@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_BASE_URL, SOCIETY_INFO } from './config';
+import { API_BASE_URL, SOCIETY_INFO, SUPABASE_URL, SUPABASE_KEY } from './config';
 import AdminLogin from './components/AdminLogin';
 import DashboardOverview from './components/DashboardOverview';
 import BookingManagement from './components/BookingManagement';
@@ -14,6 +14,61 @@ import AuditLogs from './components/AuditLogs';
 import AdminSettings from './components/AdminSettings';
 import WalkInBookingModal from './components/WalkInBookingModal';
 import UserProfileModal from './components/UserProfileModal';
+
+function formatSupabaseBooking(b) {
+  return {
+    id: b.id,
+    name: b.name || b.guest_name || '',
+    email: b.email || b.guest_email || '',
+    phone: b.phone || b.guest_phone || '',
+    date: b.date || b.check_in_date || '',
+    roomType: b.roomType || b.room_type || '',
+    amount: Number(b.amount) || 0,
+    paymentMethod: b.paymentMethod || b.payment_method || 'Pay at Counter / Property',
+    status: b.status || 'Pending at Check-in',
+    notes: b.notes || '',
+    paymentId: b.paymentId || b.payment_id || null,
+    orderId: b.orderId || b.order_id || null,
+    createdAt: b.createdAt || b.created_at || new Date().toISOString(),
+  };
+}
+
+function calculateStatsFromBookings(bookingList) {
+  const activeBookings = bookingList.filter((b) => b.status !== 'Cancelled' && b.status !== 'Refunded');
+  const checkedIn = bookingList.filter((b) => b.status === 'Checked In');
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayArrivals = activeBookings.filter((b) => b.date === todayStr);
+
+  const totalRevenue = activeBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
+  const counterBookings = activeBookings.filter((b) => !b.paymentMethod?.toLowerCase().includes('online') && !b.paymentMethod?.toLowerCase().includes('razorpay'));
+  const onlineBookings = activeBookings.filter((b) => b.paymentMethod?.toLowerCase().includes('online') || b.paymentMethod?.toLowerCase().includes('razorpay'));
+
+  const todaySuites = activeBookings.filter((b) => b.date === todayStr && b.roomType.includes('Suite')).length;
+  const todayDormBeds = activeBookings.filter((b) => b.date === todayStr && b.roomType.includes('Dormitory')).length;
+
+  return {
+    overview: {
+      totalBookings: bookingList.length,
+      activeBookings: activeBookings.length,
+      totalRevenue,
+      todayArrivals: todayArrivals.length,
+      checkedInNow: checkedIn.length,
+    },
+    inventory: {
+      totalSuites: 5,
+      availableSuites: Math.max(0, 5 - todaySuites),
+      maintenanceSuites: 0,
+      totalDormBeds: 15,
+      availableDormBeds: Math.max(0, 15 - todayDormBeds),
+      maintenanceDormBeds: 0,
+    },
+    byPayment: {
+      online: { count: onlineBookings.length, revenue: onlineBookings.reduce((s, b) => s + (b.amount || 0), 0) },
+      counter: { count: counterBookings.length, revenue: counterBookings.reduce((s, b) => s + (b.amount || 0), 0) },
+    },
+    bookingsRoster: bookingList,
+  };
+}
 
 export default function AdminApp() {
   const [token, setToken] = useState(() => sessionStorage.getItem('wdpcs_admin_token') || null);
@@ -88,9 +143,10 @@ export default function AdminApp() {
       if (res.ok) {
         const data = await res.json();
         setStats(data);
+        return;
       }
-    } catch (err) {
-      console.warn('Failed to fetch stats:', err);
+    } catch {
+      // Fallback: Stats are computed directly from bookings in fetchBookings
     }
   }, [token, handleLogout]);
 
@@ -103,9 +159,26 @@ export default function AdminApp() {
       if (res.ok) {
         const data = await res.json();
         setBookings(data.bookings || []);
+        return;
+      }
+    } catch {}
+
+    // Fallback: Query Supabase Cloud direct
+    try {
+      const sbRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings?select=*&order=created_at.desc`, {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      });
+      if (sbRes.ok) {
+        const data = await sbRes.json();
+        const formatted = Array.isArray(data) ? data.map(formatSupabaseBooking) : [];
+        setBookings(formatted);
+        setStats(calculateStatsFromBookings(formatted));
       }
     } catch (err) {
-      console.warn('Failed to fetch bookings:', err);
+      console.warn('Supabase direct bookings fetch error:', err);
     }
   }, [token]);
 
@@ -136,15 +209,14 @@ export default function AdminApp() {
             setUnreadCount(data.unreadCount || 0);
           }
         }
-      } catch (err) {
-        console.warn('Failed to fetch notifications:', err);
-      }
+      } catch {}
     },
     [token, playAlertChime]
   );
 
   // Status changer
   const handleStatusChange = async (id, newStatus) => {
+    let updated = false;
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/bookings/${id}`, {
         method: 'PATCH',
@@ -154,30 +226,68 @@ export default function AdminApp() {
         },
         body: JSON.stringify({ status: newStatus }),
       });
-      if (res.ok) {
-        setBookings((prev) =>
-          prev.map((b) => (b.id === id ? { ...b, status: newStatus } : b))
-        );
-        fetchStats();
+      if (res.ok) updated = true;
+    } catch {}
+
+    if (!updated) {
+      try {
+        const sbRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${id}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            Prefer: 'return=minimal',
+          },
+          body: JSON.stringify({ status: newStatus }),
+        });
+        if (sbRes.ok) updated = true;
+      } catch (err) {
+        console.error('Failed to change booking status in Supabase:', err);
       }
-    } catch (err) {
-      console.error('Failed to change booking status:', err);
+    }
+
+    if (updated) {
+      setBookings((prev) => {
+        const next = prev.map((b) => (b.id === id ? { ...b, status: newStatus } : b));
+        setStats(calculateStatsFromBookings(next));
+        return next;
+      });
     }
   };
 
   // Delete booking
   const handleDeleteBooking = async (id) => {
+    let deleted = false;
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/bookings/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) {
-        setBookings((prev) => prev.filter((b) => b.id !== id));
-        fetchStats();
+      if (res.ok) deleted = true;
+    } catch {}
+
+    if (!deleted) {
+      try {
+        const sbRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${id}`, {
+          method: 'DELETE',
+          headers: {
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+          },
+        });
+        if (sbRes.ok) deleted = true;
+      } catch (err) {
+        console.error('Failed to delete booking in Supabase:', err);
       }
-    } catch (err) {
-      console.error('Failed to delete booking:', err);
+    }
+
+    if (deleted) {
+      setBookings((prev) => {
+        const next = prev.filter((b) => b.id !== id);
+        setStats(calculateStatsFromBookings(next));
+        return next;
+      });
     }
   };
 
