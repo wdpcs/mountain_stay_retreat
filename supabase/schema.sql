@@ -125,8 +125,24 @@ create table if not exists public.bookings (
   check_in_date date not null,
   room_type text not null,
   amount integer not null check (amount >= 0),
-  payment_method text not null check (payment_method in ('Online Pre-payment (Razorpay)', 'Pay at Counter / Property', 'Direct Walk-in / Reception Cash')),
-  status text not null check (status in ('Pending at Check-in', 'Paid Online', 'Checked In', 'Checked Out', 'Cancelled', 'Refunded')),
+  payment_method text not null check (payment_method in (
+    'Online Pre-payment (Razorpay)',
+    'Pay at Counter / Property',
+    'Direct Walk-in / Reception Cash',
+    'Cash at Counter',
+    'UPI / QR Code at Desk',
+    'Card POS Machine',
+    'UPI / Razorpay'
+  )),
+  status text not null check (status in (
+    'Pending at Check-in',
+    'Paid Online',
+    'Paid at Counter',
+    'Checked In',
+    'Checked Out',
+    'Cancelled',
+    'Refunded'
+  )),
   notes text,
   payment_id text,
   order_id text,

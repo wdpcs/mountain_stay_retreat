@@ -336,7 +336,7 @@ async function syncWithSupabase() {
 
     if (rpcRes.ok) {
       const data = await rpcRes.json();
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         bookings = data.map(formatBookingFromDB);
         return;
       }
@@ -352,7 +352,7 @@ async function syncWithSupabase() {
 
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data)) {
+      if (Array.isArray(data) && data.length > 0) {
         bookings = data.map(formatBookingFromDB);
       }
     }
@@ -364,7 +364,37 @@ async function syncWithSupabase() {
 async function syncBookingToSupabase(record) {
   if (!isSupabaseConfigured()) return;
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
+    let status = record.status || 'Pending at Check-in';
+    if (status === 'Paid at Counter') {
+      status = 'Checked In';
+    }
+
+    let paymentMethod = record.paymentMethod || 'Pay at Counter / Property';
+    if (paymentMethod.includes('Cash') || paymentMethod.includes('Desk') || paymentMethod.includes('POS')) {
+      paymentMethod = 'Direct Walk-in / Reception Cash';
+    } else if (paymentMethod.includes('Online') || paymentMethod.includes('Razorpay')) {
+      paymentMethod = 'Online Pre-payment (Razorpay)';
+    } else {
+      paymentMethod = 'Pay at Counter / Property';
+    }
+
+    const payload = {
+      id: record.id,
+      guest_name: record.name,
+      guest_email: record.email,
+      guest_phone: record.phone,
+      check_in_date: record.date,
+      room_type: record.roomType,
+      amount: Number(record.amount) || 0,
+      payment_method: paymentMethod,
+      status: status,
+      notes: record.notes || '',
+      payment_id: record.paymentId || null,
+      order_id: record.orderId || null,
+      created_at: record.createdAt || new Date().toISOString(),
+    };
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -372,22 +402,13 @@ async function syncBookingToSupabase(record) {
         Authorization: `Bearer ${SUPABASE_KEY}`,
         Prefer: 'return=minimal',
       },
-      body: JSON.stringify({
-        id: record.id,
-        guest_name: record.name,
-        guest_email: record.email,
-        guest_phone: record.phone,
-        check_in_date: record.date,
-        room_type: record.roomType,
-        amount: record.amount,
-        payment_method: record.paymentMethod,
-        status: record.status,
-        notes: record.notes || '',
-        payment_id: record.paymentId || null,
-        order_id: record.orderId || null,
-        created_at: record.createdAt || new Date().toISOString(),
-      }),
+      body: JSON.stringify(payload),
     });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.warn('Sync booking to Supabase returned error:', res.status, errText);
+    }
   } catch (err) {
     console.warn('Sync booking to Supabase notice:', err.message);
   }
@@ -396,7 +417,9 @@ async function syncBookingToSupabase(record) {
 async function syncBookingStatusToSupabase(bookingId, newStatus, notes) {
   if (!isSupabaseConfigured()) return;
   try {
-    const updateBody = { status: newStatus };
+    let dbStatus = newStatus;
+    if (dbStatus === 'Paid at Counter') dbStatus = 'Checked In';
+    const updateBody = { status: dbStatus };
     if (notes !== undefined) updateBody.notes = notes;
     await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${bookingId}`, {
       method: 'PATCH',
@@ -1031,7 +1054,8 @@ app.post('/api/admin/prices', requireAuth(['admin', 'manager']), (req, res) => {
 });
 
 // Availability Calendar View (Next 30 days)
-app.get('/api/admin/calendar', requireAuth(), (req, res) => {
+app.get('/api/admin/calendar', requireAuth(), async (req, res) => {
+  await syncWithSupabase();
   const { days = 30 } = req.query;
   const calendarData = [];
   const today = new Date();
@@ -1066,7 +1090,8 @@ app.get('/api/admin/calendar', requireAuth(), (req, res) => {
 });
 
 // Guest Directory CRM
-app.get('/api/admin/guests', requireAuth(), (req, res) => {
+app.get('/api/admin/guests', requireAuth(), async (req, res) => {
+  await syncWithSupabase();
   const guestMap = new Map();
 
   bookings.forEach((b) => {
@@ -1111,7 +1136,7 @@ app.get('/api/admin/refunds', requireAuth(), (req, res) => {
   res.json({ success: true, refunds });
 });
 
-app.post('/api/admin/refunds', requireAuth(['admin', 'manager']), (req, res) => {
+app.post('/api/admin/refunds', requireAuth(['admin', 'manager']), async (req, res) => {
   const { bookingId, refundAmount, reason, refundMethod } = req.body;
   const booking = bookings.find((b) => b.id === bookingId);
 
@@ -1120,6 +1145,7 @@ app.post('/api/admin/refunds', requireAuth(['admin', 'manager']), (req, res) => 
   }
 
   booking.status = 'Cancelled';
+  await syncBookingStatusToSupabase(bookingId, 'Cancelled', reason || 'Customer requested cancellation');
 
   const refundEntry = {
     id: 'REF-' + Date.now().toString().slice(-6),
@@ -1141,7 +1167,8 @@ app.post('/api/admin/refunds', requireAuth(['admin', 'manager']), (req, res) => 
 });
 
 // Reports & Analytics
-app.get('/api/admin/reports', requireAuth(), (req, res) => {
+app.get('/api/admin/reports', requireAuth(), async (req, res) => {
+  await syncWithSupabase();
   const totalBookings = bookings.length;
   const activeBookings = bookings.filter((b) => b.status !== 'Cancelled');
   const cancelledBookings = bookings.filter((b) => b.status === 'Cancelled');
@@ -1405,8 +1432,22 @@ app.delete('/api/admin/notifications/:id', requireAuth(), (req, res) => {
 });
 
 // System Data Reset (Super Admin only)
-app.post('/api/admin/system/reset', requireAuth(['admin']), (req, res) => {
+app.post('/api/admin/system/reset', requireAuth(['admin']), async (req, res) => {
   const { mode = 'factory_seed' } = req.body;
+
+  if (isSupabaseConfigured()) {
+    try {
+      await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=neq.placeholder`, {
+        method: 'DELETE',
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      });
+    } catch (err) {
+      console.warn('Supabase reset wipe notice:', err.message);
+    }
+  }
 
   if (mode === 'clear_all') {
     bookings = [];
