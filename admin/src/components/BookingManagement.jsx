@@ -81,10 +81,13 @@ export default function BookingManagement({
           </style>
         </head>
         <body>
-          <div class="header">
-            <div class="entity">${SOCIETY_INFO.name}</div>
-            <div class="title">${SOCIETY_INFO.property} — Guest Folio</div>
-            <div style="font-size: 12px; color: #64748b; margin-top: 4px;">${SOCIETY_INFO.location} | Ph: ${SOCIETY_INFO.contactPhone}</div>
+          <div class="header" style="display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+            <div>
+              <div class="entity">${SOCIETY_INFO.name}</div>
+              <div class="title">${SOCIETY_INFO.property} — Guest Folio</div>
+              <div style="font-size: 12px; color: #64748b; margin-top: 4px;">${SOCIETY_INFO.location} | Ph: ${SOCIETY_INFO.contactPhone}</div>
+            </div>
+            <img src="./logo.png" alt="Mountain Stay Retreat Logo" style="height: 68px; width: 68px; object-fit: contain; border-radius: 50%; border: 1px solid #cbd5e1;" />
           </div>
 
           <div class="grid">

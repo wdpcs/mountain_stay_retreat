@@ -5,9 +5,11 @@ export default function BookingModal({ bookingConfirmation, onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white p-6 sm:p-8 text-slate-800 shadow-2xl">
         <div className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 text-3xl">
-            🎉
-          </div>
+          <img
+            src={`${(import.meta.env.BASE_URL || './').replace(/\/+$/, '')}/logo.png`}
+            alt="Mountain Stay Retreat"
+            className="mx-auto mb-3 h-16 w-16 rounded-full object-contain border border-slate-200 shadow-sm bg-white"
+          />
           <h3 className="text-2xl font-bold text-slate-900">
             Booking Confirmed!
           </h3>

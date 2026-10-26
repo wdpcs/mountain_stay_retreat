@@ -11,17 +11,26 @@ export default function Navbar() {
     { name: 'Contact', href: '#contact' },
   ];
 
+  const logoUrl = `${(import.meta.env.BASE_URL || './').replace(/\/+$/, '')}/logo.png`;
+
   return (
     <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm shadow-sm transition-all">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3.5">
         <div>
-          <a href="#" className="block">
-            <h1 className="text-xl sm:text-2xl font-bold tracking-wide text-slate-900">
-              Mountain Stay Retreat
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium">
-              WDPCS Accommodation • Suites & Dormitory
-            </p>
+          <a href="#" className="flex items-center gap-3.5 group">
+            <img
+              src={logoUrl}
+              alt="Mountain Stay Retreat Logo"
+              className="h-12 w-12 sm:h-14 sm:w-14 rounded-full object-contain bg-white shadow-xs border border-slate-200/80 group-hover:scale-105 transition-transform duration-300"
+            />
+            <div>
+              <h1 className="text-lg sm:text-2xl font-bold tracking-wide text-slate-900 leading-tight">
+                Mountain Stay Retreat
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 font-medium">
+                WDPCS Accommodation • Suites & Dormitory
+              </p>
+            </div>
           </a>
         </div>
 

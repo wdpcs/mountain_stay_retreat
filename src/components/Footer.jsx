@@ -15,12 +15,19 @@ export default function Footer() {
 
       {/* Footer */}
       <footer className="bg-slate-950 py-10 px-6 text-center text-xs sm:text-sm text-slate-400 border-t border-slate-900">
-        <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="text-left">
-            <p className="font-bold text-slate-200">Mountain Stay Retreat</p>
-            <p className="text-xs text-slate-500">
-              Wayanad District Police Co-operative Society Ltd. No. W 208
-            </p>
+        <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-3.5 text-left">
+            <img
+              src={`${(import.meta.env.BASE_URL || './').replace(/\/+$/, '')}/logo.png`}
+              alt="Mountain Stay Retreat Logo"
+              className="h-12 w-12 rounded-full object-contain bg-white p-0.5 shadow-md border border-slate-700"
+            />
+            <div>
+              <p className="font-bold text-slate-200 text-sm">Mountain Stay Retreat</p>
+              <p className="text-xs text-slate-400">
+                Wayanad District Police Co-operative Society Ltd. No. W 208
+              </p>
+            </div>
           </div>
           <div>
             <p>© 2026 Mountain Stay Retreat. All Rights Reserved.</p>

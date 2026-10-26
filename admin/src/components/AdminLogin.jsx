@@ -50,9 +50,11 @@ export default function AdminLogin({ onLoginSuccess }) {
       <div className="w-full max-w-lg z-10">
         {/* Entity Header Banner */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 shadow-xl shadow-blue-500/20 text-3xl mb-3 text-white">
-            🛡️
-          </div>
+          <img
+            src="./logo.png"
+            alt="Mountain Stay Retreat Logo"
+            className="inline-block h-20 w-20 rounded-full object-contain bg-white shadow-lg border-2 border-slate-200 mb-3"
+          />
           <h2 className="text-xs font-extrabold uppercase tracking-wider text-blue-700">
             Wayanad District Police Co-operative Society Ltd. No. W 208
           </h2>

@@ -61,14 +61,20 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
       <div className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div>
-            <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">
-              Front Desk Reception
-            </span>
-            <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
-              <span>🛎️</span>
-              <span>New Walk-in Reservation</span>
-            </h3>
+          <div className="flex items-center gap-3">
+            <img
+              src="./logo.png"
+              alt="Mountain Stay Retreat"
+              className="h-10 w-10 rounded-full object-contain border border-slate-200 bg-white"
+            />
+            <div>
+              <span className="text-[11px] font-bold text-blue-700 uppercase tracking-wider">
+                Front Desk Reception
+              </span>
+              <h3 className="text-lg font-extrabold text-slate-900">
+                New Walk-in Reservation
+              </h3>
+            </div>
           </div>
           <button
             onClick={onClose}
