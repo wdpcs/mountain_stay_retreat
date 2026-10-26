@@ -1555,6 +1555,57 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// ==========================================
+// 5. PRODUCTION STATIC HOSTING (OPTIONAL UNIFIED DEPLOYMENT)
+// ==========================================
+const guestDist = path.join(__dirname, '../dist');
+const adminDist = path.join(__dirname, '../dist/admin');
+
+if (fs.existsSync(guestDist)) {
+  const getRequestHost = (req) =>
+    (req.headers['x-forwarded-host'] || req.headers.host || '').toLowerCase();
+
+  // 1. Host-based routing: If request host is roomsadmin.wdpcs.in, serve Admin portal
+  app.use((req, res, next) => {
+    const host = getRequestHost(req);
+    if (host.startsWith('roomsadmin') && fs.existsSync(adminDist)) {
+      return express.static(adminDist)(req, res, next);
+    }
+    next();
+  });
+
+  // 2. Host-based SPA fallback for roomsadmin
+  app.use((req, res, next) => {
+    const host = getRequestHost(req);
+    if (host.startsWith('roomsadmin') && !req.path.startsWith('/api') && fs.existsSync(path.join(adminDist, 'index.html'))) {
+      return res.sendFile(path.join(adminDist, 'index.html'));
+    }
+    next();
+  });
+
+  // 3. Path-based routing: /admin serves Admin portal
+  if (fs.existsSync(adminDist)) {
+    app.use('/admin', express.static(adminDist));
+    app.use('/admin', (req, res, next) => {
+      if (req.path.startsWith('/api')) return next();
+      if (fs.existsSync(path.join(adminDist, 'index.html'))) {
+        return res.sendFile(path.join(adminDist, 'index.html'));
+      }
+      next();
+    });
+  }
+
+  // 4. Default: Serve Guest portal
+  app.use(express.static(guestDist));
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    if (req.method === 'GET' && fs.existsSync(path.join(guestDist, 'index.html'))) {
+      return res.sendFile(path.join(guestDist, 'index.html'));
+    }
+    next();
+  });
+}
+
 // Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
