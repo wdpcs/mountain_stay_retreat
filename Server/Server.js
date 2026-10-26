@@ -3,6 +3,7 @@ import cors from 'cors';
 import Razorpay from 'razorpay';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 
@@ -204,7 +205,9 @@ function requireAuth(allowedRoles = []) {
 // 3. CENTRAL DATA STORE & SEED DATA
 // ==========================================
 
-const staffUsers = [
+const STAFF_USERS_FILE = path.join(__dirname, 'staff_users.json');
+
+const DEFAULT_STAFF_USERS = [
   {
     id: 'USR-001',
     username: 'admin',
@@ -239,6 +242,32 @@ const staffUsers = [
     createdAt: '2026-02-01T00:00:00Z',
   },
 ];
+
+function saveStaffUsers(usersToSave = staffUsers) {
+  try {
+    fs.writeFileSync(STAFF_USERS_FILE, JSON.stringify(usersToSave, null, 2), 'utf8');
+  } catch (err) {
+    console.error('[AUTH] Failed to save staff_users.json:', err.message);
+  }
+}
+
+function loadStaffUsers() {
+  try {
+    if (fs.existsSync(STAFF_USERS_FILE)) {
+      const raw = fs.readFileSync(STAFF_USERS_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.error('[AUTH] Failed to read staff_users.json, fallback to defaults:', err.message);
+  }
+  saveStaffUsers(DEFAULT_STAFF_USERS);
+  return [...DEFAULT_STAFF_USERS];
+}
+
+let staffUsers = loadStaffUsers();
 
 const TOTAL_SUITES = 5;
 const TOTAL_DORM_BEDS = 15;
@@ -1240,6 +1269,7 @@ app.post('/api/admin/users', requireAuth(['admin']), (req, res) => {
   };
 
   staffUsers.push(newUser);
+  saveStaffUsers();
   logAuditEvent(req.adminUser, 'CREATE_USER', 'User', newUser.id, `Created staff user ${newUser.username} with role ${newUser.role}`, req);
 
   const sanitized = { ...newUser };
@@ -1269,6 +1299,7 @@ app.put('/api/admin/profile', requireAuth(), (req, res) => {
   if (name) user.name = name.trim();
   if (email) user.email = email.trim();
   if (phone !== undefined) user.phone = phone.trim();
+  saveStaffUsers();
 
   logAuditEvent(req.adminUser, 'UPDATE_PROFILE', 'User', user.id, `User ${user.username} updated profile information.`, req);
 
@@ -1310,6 +1341,7 @@ app.post('/api/admin/profile/change-password', requireAuth(), (req, res) => {
   }
 
   user.passwordHash = hashPassword(newPassword);
+  saveStaffUsers();
   logAuditEvent(req.adminUser, 'CHANGE_PASSWORD', 'Auth', user.id, `User ${user.username} changed their account password.`, req);
 
   res.json({ success: true, message: 'Password changed successfully.' });
@@ -1329,6 +1361,7 @@ app.patch('/api/admin/users/:id', requireAuth(['admin']), (req, res) => {
   if (phone !== undefined) user.phone = phone.trim();
   if (role !== undefined) user.role = role;
   if (active !== undefined) user.active = Boolean(active);
+  saveStaffUsers();
 
   logAuditEvent(req.adminUser, 'ADMIN_UPDATE_USER', 'User', id, `Updated staff profile for ${user.username} (${user.role})`, req);
 
@@ -1352,6 +1385,7 @@ app.post('/api/admin/users/:id/reset-password', requireAuth(['admin']), (req, re
   }
 
   user.passwordHash = hashPassword(newPassword);
+  saveStaffUsers();
   logAuditEvent(req.adminUser, 'ADMIN_RESET_PASSWORD', 'Auth', id, `Admin reset password for staff member ${user.username}`, req);
 
   res.json({ success: true, message: `Password for ${user.username} has been reset successfully.` });
@@ -1370,6 +1404,7 @@ app.delete('/api/admin/users/:id', requireAuth(['admin']), (req, res) => {
   }
 
   const removed = staffUsers.splice(idx, 1)[0];
+  saveStaffUsers();
   logAuditEvent(req.adminUser, 'ADMIN_DELETE_USER', 'User', id, `Deleted staff account ${removed.username}`, req);
 
   res.json({ success: true, message: `Staff account ${removed.username} has been removed.` });
