@@ -506,7 +506,8 @@ function checkRoomAvailability(date, roomType) {
 // ==========================================
 
 // Public availability endpoint
-app.get('/api/availability', (req, res) => {
+app.get('/api/availability', async (req, res) => {
+  await syncWithSupabase();
   const { date } = req.query;
   const activeBookings = bookings.filter(
     (b) => b.status !== 'Cancelled' && (!date || b.date === date)
@@ -536,7 +537,7 @@ app.get('/api/prices', (req, res) => {
 });
 
 // Public Counter booking reservation
-app.post('/book-counter', (req, res) => {
+app.post('/book-counter', async (req, res) => {
   try {
     const { name, email, phone, date, roomType } = req.body;
 
@@ -567,6 +568,7 @@ app.post('/book-counter', (req, res) => {
     };
 
     bookings.unshift(newBooking);
+    await syncBookingToSupabase(newBooking);
 
     // Create Admin Notification
     const notif = {
@@ -625,7 +627,7 @@ app.post('/create-order', async (req, res) => {
 });
 
 // Confirm online payment
-app.post('/api/confirm-online-booking', (req, res) => {
+app.post('/api/confirm-online-booking', async (req, res) => {
   try {
     const { id, name, email, phone, date, roomType, amount, paymentId, orderId } = req.body;
 
@@ -652,10 +654,13 @@ app.post('/api/confirm-online-booking', (req, res) => {
       amount: calculatedAmount,
       paymentMethod: 'Online Pre-payment (Razorpay)',
       status: 'Paid Online',
+      paymentId: paymentId || null,
+      orderId: orderId || null,
       createdAt: new Date().toISOString(),
     };
 
     bookings.unshift(newBooking);
+    await syncBookingToSupabase(newBooking);
 
     // Record Transaction
     transactions.unshift({
@@ -766,7 +771,8 @@ app.post('/api/admin/logout', requireAuth(), (req, res) => {
 });
 
 // Dashboard Overview KPIs
-app.get('/api/admin/dashboard/stats', requireAuth(), (req, res) => {
+app.get('/api/admin/dashboard/stats', requireAuth(), async (req, res) => {
+  await syncWithSupabase();
   const todayStr = new Date().toISOString().split('T')[0];
 
   const todayCheckIns = bookings.filter((b) => b.date === todayStr && b.status !== 'Cancelled');
@@ -818,7 +824,8 @@ app.get('/api/admin/dashboard/stats', requireAuth(), (req, res) => {
 });
 
 // Bookings List with Filters
-app.get('/api/admin/bookings', requireAuth(), (req, res) => {
+app.get('/api/admin/bookings', requireAuth(), async (req, res) => {
+  await syncWithSupabase();
   const { search, status, roomType, date } = req.query;
   let result = [...bookings];
 
@@ -849,7 +856,7 @@ app.get('/api/admin/bookings', requireAuth(), (req, res) => {
 });
 
 // Manual Front Desk Walk-In Booking
-app.post('/api/admin/bookings/walkin', requireAuth(['admin', 'manager', 'receptionist']), (req, res) => {
+app.post('/api/admin/bookings/walkin', requireAuth(['admin', 'manager', 'receptionist']), async (req, res) => {
   const { name, email, phone, date, roomType, amount, paymentMethod, status, notes } = req.body;
 
   const validationErrors = validateBookingData({ name, email, phone, date, roomType });
@@ -876,6 +883,7 @@ app.post('/api/admin/bookings/walkin', requireAuth(['admin', 'manager', 'recepti
   };
 
   bookings.unshift(newBooking);
+  await syncBookingToSupabase(newBooking);
 
   // If marked paid, create transaction record
   if (newBooking.status === 'Paid at Counter' || newBooking.status === 'Checked In') {
@@ -898,7 +906,7 @@ app.post('/api/admin/bookings/walkin', requireAuth(['admin', 'manager', 'recepti
 });
 
 // Update Booking Status
-app.patch('/api/admin/bookings/:id', requireAuth(), (req, res) => {
+app.patch('/api/admin/bookings/:id', requireAuth(), async (req, res) => {
   const { id } = req.params;
   const { status, notes } = req.body;
   const booking = bookings.find((b) => b.id === id);
@@ -911,16 +919,20 @@ app.patch('/api/admin/bookings/:id', requireAuth(), (req, res) => {
   if (status) booking.status = status;
   if (notes !== undefined) booking.notes = notes;
 
+  await syncBookingStatusToSupabase(id, status, notes);
+
   logAuditEvent(req.adminUser, 'UPDATE_BOOKING_STATUS', 'Booking', id, `Changed status from '${oldStatus}' to '${status}'.`, req);
 
   res.json({ success: true, booking });
 });
 
 // Delete Booking (Admin & Manager only)
-app.delete('/api/admin/bookings/:id', requireAuth(['admin', 'manager']), (req, res) => {
+app.delete('/api/admin/bookings/:id', requireAuth(['admin', 'manager']), async (req, res) => {
   const { id } = req.params;
   const initialLength = bookings.length;
   bookings = bookings.filter((b) => b.id !== id);
+
+  await deleteBookingFromSupabase(id);
 
   if (bookings.length === initialLength) {
     return res.status(404).json({ success: false, error: 'Booking not found.' });
@@ -931,7 +943,8 @@ app.delete('/api/admin/bookings/:id', requireAuth(['admin', 'manager']), (req, r
 });
 
 // Inventory Status & Maintenance Controls
-app.get('/api/admin/inventory', requireAuth(), (req, res) => {
+app.get('/api/admin/inventory', requireAuth(), async (req, res) => {
+  await syncWithSupabase();
   const todayStr = new Date().toISOString().split('T')[0];
   const activeBookings = bookings.filter((b) => b.date === todayStr && b.status !== 'Cancelled');
 
