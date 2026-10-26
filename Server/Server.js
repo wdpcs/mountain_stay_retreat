@@ -269,145 +269,25 @@ let societySettings = {
     'Full refund if cancelled at least 24 hours prior to check-in date. Cancellations within 24 hours incur 1-night retention charges.',
 };
 
-let bookings = [
-  {
-    id: 'MSR-RZP-984210',
-    name: 'Anand Kumar',
-    email: 'anand.k@gmail.com',
-    phone: '+91 98450 12345',
-    date: '2026-10-24',
-    roomType: 'Suite Room (₹2,500/night)',
-    amount: 2500,
-    paymentMethod: 'Online Pre-payment (Razorpay)',
-    status: 'Paid Online',
-    notes: 'Ground floor requested',
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-  {
-    id: 'MSR-CTR-482910',
-    name: 'Priya Sharma',
-    email: 'priya.s@yahoo.com',
-    phone: '+91 97412 67890',
-    date: '2026-10-23',
-    roomType: 'Dormitory Bed (₹450/night)',
-    amount: 450,
-    paymentMethod: 'Pay at Counter / Property',
-    status: 'Checked In',
-    notes: 'Walk-in booking recorded by reception',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-  {
-    id: 'MSR-RZP-319582',
-    name: 'Rohan Mehta',
-    email: 'rohan.mehta@outlook.com',
-    phone: '+91 99001 23456',
-    date: '2026-10-25',
-    roomType: 'Suite Room (₹2,500/night)',
-    amount: 2500,
-    paymentMethod: 'Online Pre-payment (Razorpay)',
-    status: 'Paid Online',
-    notes: 'Late arrival around 6:00 PM',
-    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-  },
-  {
-    id: 'MSR-CTR-109284',
-    name: 'Siddharth Nair',
-    email: 'siddharth@gmail.com',
-    phone: '+91 70250 17611',
-    date: '2026-10-23',
-    roomType: 'Dormitory Bed (₹450/night)',
-    amount: 450,
-    paymentMethod: 'Pay at Counter / Property',
-    status: 'Pending at Check-in',
-    notes: 'Police Department member guest',
-    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-  },
-];
-
-let transactions = [
-  {
-    id: 'TXN-984210',
-    orderId: 'order_RZP984210',
-    paymentId: 'pay_984210_captured',
-    bookingId: 'MSR-RZP-984210',
-    guestName: 'Anand Kumar',
-    amount: 2500,
-    paymentMethod: 'UPI / Razorpay',
-    status: 'Captured',
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-  },
-  {
-    id: 'TXN-319582',
-    orderId: 'order_RZP319582',
-    paymentId: 'pay_319582_captured',
-    bookingId: 'MSR-RZP-319582',
-    guestName: 'Rohan Mehta',
-    amount: 2500,
-    paymentMethod: 'Netbanking / Razorpay',
-    status: 'Captured',
-    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-  },
-  {
-    id: 'TXN-482910',
-    orderId: 'counter_manual',
-    paymentId: 'CASH_REC_4829',
-    bookingId: 'MSR-CTR-482910',
-    guestName: 'Priya Sharma',
-    amount: 450,
-    paymentMethod: 'Cash at Counter',
-    status: 'Captured',
-    createdAt: new Date(Date.now() - 86400000).toISOString(),
-  },
-];
-
-let refunds = [
-  {
-    id: 'REF-101',
-    bookingId: 'MSR-CTR-OLD001',
-    guestName: 'Kavitha Unni',
-    amount: 450,
-    refundAmount: 450,
-    reason: 'Guest emergency travel cancellation',
-    refundMethod: 'Cash Counter Settlement',
-    status: 'Processed',
-    processedBy: 'manager',
-    createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
-  },
-];
-
+// Dynamic transactional stores (initialized empty, storing real activity only)
+let bookings = [];
+let transactions = [];
+let refunds = [];
 let auditLogs = [
   {
     id: 'AUD-001',
-    timestamp: new Date(Date.now() - 86400000 * 3).toISOString(),
+    timestamp: new Date().toISOString(),
     userId: 'USR-001',
     username: 'admin',
     role: 'admin',
     action: 'SYSTEM_INITIALIZATION',
     targetType: 'System',
     targetId: 'W208',
-    details: 'WDPCS Accommodation Admin Portal session initialized.',
+    details: 'WDPCS Accommodation system initialized with clean default values.',
     ip: '127.0.0.1',
   },
 ];
-
-let notifications = [
-  {
-    id: 'NOTIF-1',
-    type: 'new_booking',
-    bookingId: 'MSR-CTR-109284',
-    title: 'New Reservation: Siddharth Nair',
-    message: 'Siddharth Nair booked Dormitory Bed for 2026-10-23 (₹450)',
-    amount: 450,
-    roomType: 'Dormitory Bed (₹450/night)',
-    guestName: 'Siddharth Nair',
-    guestPhone: '+91 70250 17611',
-    guestEmail: 'siddharth@gmail.com',
-    checkInDate: '2026-10-23',
-    paymentMethod: 'Pay at Counter / Property',
-    read: false,
-    createdAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-  },
-];
+let notifications = [];
 
 function logAuditEvent(adminUser, action, targetType, targetId, details, req) {
   const logEntry = {
@@ -1399,62 +1279,9 @@ app.post('/api/admin/system/reset', requireAuth(['admin']), (req, res) => {
     });
   }
 
-  // Default: Restore clean demo seed
-  const todayStr = new Date().toISOString().split('T')[0];
-  bookings = [
-    {
-      id: 'MSR-RZP-984210',
-      name: 'Anand Kumar',
-      email: 'anand.k@gmail.com',
-      phone: '+91 98450 12345',
-      date: todayStr,
-      roomType: 'Suite Room (₹2,500/night)',
-      amount: 2500,
-      paymentMethod: 'Online Pre-payment (Razorpay)',
-      status: 'Paid Online',
-      notes: 'Ground floor requested',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'MSR-CTR-482910',
-      name: 'Priya Sharma',
-      email: 'priya.s@yahoo.com',
-      phone: '+91 97412 67890',
-      date: todayStr,
-      roomType: 'Dormitory Bed (₹450/night)',
-      amount: 450,
-      paymentMethod: 'Pay at Counter / Property',
-      status: 'Checked In',
-      notes: 'Walk-in booking recorded by reception',
-      createdAt: new Date().toISOString(),
-    },
-  ];
-
-  transactions = [
-    {
-      id: 'TXN-984210',
-      orderId: 'order_RZP984210',
-      paymentId: 'pay_984210_captured',
-      bookingId: 'MSR-RZP-984210',
-      guestName: 'Anand Kumar',
-      amount: 2500,
-      paymentMethod: 'UPI / Razorpay',
-      status: 'Captured',
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: 'TXN-482910',
-      orderId: 'counter_manual',
-      paymentId: 'CASH_REC_4829',
-      bookingId: 'MSR-CTR-482910',
-      guestName: 'Priya Sharma',
-      amount: 450,
-      paymentMethod: 'Cash at Counter',
-      status: 'Captured',
-      createdAt: new Date().toISOString(),
-    },
-  ];
-
+  // Default: Restore clean default state
+  bookings = [];
+  transactions = [];
   refunds = [];
   notifications = [];
   roomPrices = {
