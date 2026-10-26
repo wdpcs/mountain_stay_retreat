@@ -1185,6 +1185,134 @@ app.post('/api/admin/users', requireAuth(['admin']), (req, res) => {
   res.status(201).json({ success: true, user: sanitized });
 });
 
+// Get Logged-in Staff Profile
+app.get('/api/admin/profile', requireAuth(), (req, res) => {
+  const user = staffUsers.find((u) => u.id === req.adminUser.id);
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'User profile not found.' });
+  }
+  const sanitized = { ...user };
+  delete sanitized.passwordHash;
+  res.json({ success: true, profile: sanitized });
+});
+
+// Update Logged-in Staff Profile
+app.put('/api/admin/profile', requireAuth(), (req, res) => {
+  const user = staffUsers.find((u) => u.id === req.adminUser.id);
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'User profile not found.' });
+  }
+
+  const { name, email, phone } = req.body;
+  if (name) user.name = name.trim();
+  if (email) user.email = email.trim();
+  if (phone !== undefined) user.phone = phone.trim();
+
+  logAuditEvent(req.adminUser, 'UPDATE_PROFILE', 'User', user.id, `User ${user.username} updated profile information.`, req);
+
+  const tokenPayload = {
+    id: user.id,
+    username: user.username,
+    name: user.name,
+    role: user.role,
+    email: user.email,
+  };
+  const newToken = generateToken(tokenPayload);
+
+  res.json({
+    success: true,
+    message: 'Profile updated successfully.',
+    user: tokenPayload,
+    token: newToken,
+  });
+});
+
+// Self Password Reset / Change
+app.post('/api/admin/profile/change-password', requireAuth(), (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ success: false, error: 'Current password and new password are required.' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ success: false, error: 'New password must be at least 6 characters long.' });
+  }
+
+  const user = staffUsers.find((u) => u.id === req.adminUser.id);
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'User not found.' });
+  }
+
+  if (user.passwordHash !== hashPassword(currentPassword)) {
+    return res.status(400).json({ success: false, error: 'Current password is incorrect.' });
+  }
+
+  user.passwordHash = hashPassword(newPassword);
+  logAuditEvent(req.adminUser, 'CHANGE_PASSWORD', 'Auth', user.id, `User ${user.username} changed their account password.`, req);
+
+  res.json({ success: true, message: 'Password changed successfully.' });
+});
+
+// Admin Edit Staff User Profile & Role
+app.patch('/api/admin/users/:id', requireAuth(['admin']), (req, res) => {
+  const { id } = req.params;
+  const user = staffUsers.find((u) => u.id === id);
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'Staff account not found.' });
+  }
+
+  const { name, role, email, phone, active } = req.body;
+  if (name !== undefined) user.name = name.trim();
+  if (email !== undefined) user.email = email.trim();
+  if (phone !== undefined) user.phone = phone.trim();
+  if (role !== undefined) user.role = role;
+  if (active !== undefined) user.active = Boolean(active);
+
+  logAuditEvent(req.adminUser, 'ADMIN_UPDATE_USER', 'User', id, `Updated staff profile for ${user.username} (${user.role})`, req);
+
+  const sanitized = { ...user };
+  delete sanitized.passwordHash;
+  res.json({ success: true, user: sanitized, message: 'Staff profile updated successfully.' });
+});
+
+// Admin Reset Staff Password
+app.post('/api/admin/users/:id/reset-password', requireAuth(['admin']), (req, res) => {
+  const { id } = req.params;
+  const { newPassword } = req.body;
+
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ success: false, error: 'Password must be at least 6 characters long.' });
+  }
+
+  const user = staffUsers.find((u) => u.id === id);
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'Staff account not found.' });
+  }
+
+  user.passwordHash = hashPassword(newPassword);
+  logAuditEvent(req.adminUser, 'ADMIN_RESET_PASSWORD', 'Auth', id, `Admin reset password for staff member ${user.username}`, req);
+
+  res.json({ success: true, message: `Password for ${user.username} has been reset successfully.` });
+});
+
+// Admin Delete / Deactivate Staff User
+app.delete('/api/admin/users/:id', requireAuth(['admin']), (req, res) => {
+  const { id } = req.params;
+  if (id === req.adminUser.id) {
+    return res.status(400).json({ success: false, error: 'You cannot delete your own administrative account.' });
+  }
+
+  const idx = staffUsers.findIndex((u) => u.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ success: false, error: 'Staff account not found.' });
+  }
+
+  const removed = staffUsers.splice(idx, 1)[0];
+  logAuditEvent(req.adminUser, 'ADMIN_DELETE_USER', 'User', id, `Deleted staff account ${removed.username}`, req);
+
+  res.json({ success: true, message: `Staff account ${removed.username} has been removed.` });
+});
+
 // Audit Logs
 app.get('/api/admin/audit-logs', requireAuth(), (req, res) => {
   res.json({ success: true, count: auditLogs.length, auditLogs });

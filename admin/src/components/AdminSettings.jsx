@@ -2,12 +2,29 @@ import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 import UserManagement from './UserManagement';
 
-export default function AdminSettings({ token, currentUser, onDataReset }) {
+export default function AdminSettings({ token, currentUser, onDataReset, onUserUpdated }) {
   const [activeSubTab, setActiveSubTab] = useState('profile');
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Self Profile & Password State
+  const [myProfileName, setMyProfileName] = useState(currentUser?.name || '');
+  const [myProfileEmail, setMyProfileEmail] = useState(currentUser?.email || '');
+  const [myProfilePhone, setMyProfilePhone] = useState(currentUser?.phone || '');
+  const [myProfileSuccess, setMyProfileSuccess] = useState('');
+  const [myProfileError, setMyProfileError] = useState('');
+  const [isMyProfileSubmitting, setIsMyProfileSubmitting] = useState(false);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [pwSuccess, setPwSuccess] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [isPwSubmitting, setIsPwSubmitting] = useState(false);
 
   // Reset modal state
   const [resetModalMode, setResetModalMode] = useState(null); // 'factory_seed' or 'clear_all'
@@ -36,6 +53,14 @@ export default function AdminSettings({ token, currentUser, onDataReset }) {
     fetchSettings();
   }, [fetchSettings]);
 
+  useEffect(() => {
+    if (currentUser) {
+      setMyProfileName(currentUser.name || '');
+      setMyProfileEmail(currentUser.email || '');
+      setMyProfilePhone(currentUser.phone || '');
+    }
+  }, [currentUser]);
+
   const handleSave = async (e) => {
     e.preventDefault();
     setSaveSuccess('');
@@ -59,6 +84,87 @@ export default function AdminSettings({ token, currentUser, onDataReset }) {
       console.error('Failed to save settings.');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateMyProfile = async (e) => {
+    e.preventDefault();
+    setMyProfileError('');
+    setMyProfileSuccess('');
+    setIsMyProfileSubmitting(true);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: myProfileName,
+          email: myProfileEmail,
+          phone: myProfilePhone,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setMyProfileSuccess('✅ Profile updated successfully!');
+        if (onUserUpdated) {
+          onUserUpdated(data.user, data.token);
+        }
+        setTimeout(() => setMyProfileSuccess(''), 3000);
+      } else {
+        setMyProfileError(data.error || 'Failed to update profile.');
+      }
+    } catch {
+      setMyProfileError('Failed to reach backend server. Please try again.');
+    } finally {
+      setIsMyProfileSubmitting(false);
+    }
+  };
+
+  const handleChangeMyPassword = async (e) => {
+    e.preventDefault();
+    setPwError('');
+    setPwSuccess('');
+
+    if (newPassword.length < 6) {
+      setPwError('New password must be at least 6 characters long.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPwError('New password and confirmation do not match.');
+      return;
+    }
+
+    setIsPwSubmitting(true);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/admin/profile/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setPwSuccess('✅ Your password has been changed successfully!');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setTimeout(() => setPwSuccess(''), 4000);
+      } else {
+        setPwError(data.error || 'Failed to change password.');
+      }
+    } catch {
+      setPwError('Failed to reach backend server. Please try again.');
+    } finally {
+      setIsPwSubmitting(false);
     }
   };
 
@@ -123,7 +229,7 @@ export default function AdminSettings({ token, currentUser, onDataReset }) {
             Portal Settings & Controls
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 font-medium mt-0.5">
-            Manage society profile, user accounts, payment routes, and system data maintenance
+            Manage society profile, user accounts, password resets, and system data maintenance
           </p>
         </div>
 
@@ -149,6 +255,18 @@ export default function AdminSettings({ token, currentUser, onDataReset }) {
         </button>
 
         <button
+          onClick={() => setActiveSubTab('my-profile')}
+          className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition whitespace-nowrap ${
+            activeSubTab === 'my-profile'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900'
+          }`}
+        >
+          <span>👤</span>
+          <span>My Profile & Password</span>
+        </button>
+
+        <button
           onClick={() => setActiveSubTab('users')}
           className={`flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition whitespace-nowrap ${
             activeSubTab === 'users'
@@ -157,7 +275,7 @@ export default function AdminSettings({ token, currentUser, onDataReset }) {
           }`}
         >
           <span>👥</span>
-          <span>User Management</span>
+          <span>Staff User Management</span>
         </button>
 
         <button
@@ -353,21 +471,206 @@ export default function AdminSettings({ token, currentUser, onDataReset }) {
         </form>
       )}
 
-      {/* SUB-TAB 2: EMBEDDED USER MANAGEMENT */}
+      {/* SUB-TAB 2: MY PROFILE & PASSWORD RESET */}
+      {activeSubTab === 'my-profile' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Card 1: Personal Profile Details */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+              <span className="text-xl">👤</span>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Personal Profile Details</h3>
+                <p className="text-xs text-slate-500">Update your staff name, email, and contact phone</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleUpdateMyProfile} className="space-y-3.5 text-xs">
+              {myProfileSuccess && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-emerald-800 font-bold">
+                  {myProfileSuccess}
+                </div>
+              )}
+              {myProfileError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-rose-700 font-bold">
+                  {myProfileError}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">Username</label>
+                  <input
+                    type="text"
+                    disabled
+                    value={currentUser?.username || ''}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-100 p-2.5 text-slate-600 font-mono outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-700 font-bold mb-1">System Role</label>
+                  <input
+                    type="text"
+                    disabled
+                    value={currentUser?.role?.toUpperCase() || ''}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-100 p-2.5 text-slate-600 font-mono outline-none font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Full Display Name</label>
+                <input
+                  type="text"
+                  value={myProfileName}
+                  onChange={(e) => setMyProfileName(e.target.value)}
+                  required
+                  placeholder="e.g. Chief Security Officer"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Official Email Address</label>
+                <input
+                  type="email"
+                  value={myProfileEmail}
+                  onChange={(e) => setMyProfileEmail(e.target.value)}
+                  required
+                  placeholder="admin@wdpcs.in"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Contact Phone Number</label>
+                <input
+                  type="tel"
+                  value={myProfilePhone}
+                  onChange={(e) => setMyProfilePhone(e.target.value)}
+                  placeholder="+91 98450 XXXXX"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isMyProfileSubmitting}
+                  className="rounded-xl bg-blue-600 px-5 py-2.5 font-bold text-white hover:bg-blue-700 transition disabled:opacity-50 shadow-xs"
+                >
+                  {isMyProfileSubmitting ? 'Saving...' : 'Save Profile Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Card 2: Password Reset Facility */}
+          <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+              <span className="text-xl">🔑</span>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Password Reset Facility</h3>
+                <p className="text-xs text-slate-500">Change your administrative account password</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleChangeMyPassword} className="space-y-3.5 text-xs">
+              {pwSuccess && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-emerald-800 font-bold">
+                  {pwSuccess}
+                </div>
+              )}
+              {pwError && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-rose-700 font-bold">
+                  {pwError}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Current Password</label>
+                <div className="relative">
+                  <input
+                    type={showCurrent ? 'text' : 'password'}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    required
+                    placeholder="Enter current password"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 pr-10 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrent((p) => !p)}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-700 text-xs"
+                  >
+                    {showCurrent ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">
+                  New Password (min 6 characters)
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNew ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    placeholder="Create new password"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 pr-10 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNew((p) => !p)}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-700 text-xs"
+                  >
+                    {showNew ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-700 font-bold mb-1">Confirm New Password</label>
+                <input
+                  type={showNew ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  placeholder="Re-type new password"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isPwSubmitting || !currentPassword || !newPassword}
+                  className="rounded-xl bg-blue-600 px-5 py-2.5 font-bold text-white hover:bg-blue-700 transition disabled:opacity-50 shadow-xs"
+                >
+                  {isPwSubmitting ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SUB-TAB 3: EMBEDDED USER MANAGEMENT */}
       {activeSubTab === 'users' && (
         <div className="space-y-4">
           <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 text-xs text-blue-900 font-medium flex items-center gap-2">
             <span>🛡️</span>
             <span>
-              Manage all administrative and reception personnel, create credentials, and configure
-              role-based permissions directly from settings.
+              Manage all administrative and reception personnel, create credentials, reset staff passwords, and configure role-based permissions directly from settings.
             </span>
           </div>
-          <UserManagement token={token} currentUser={currentUser} />
+          <UserManagement token={token} currentUser={currentUser} onUserUpdated={onUserUpdated} />
         </div>
       )}
 
-      {/* SUB-TAB 3: GATEWAY & ROUTING */}
+      {/* SUB-TAB 4: GATEWAY & ROUTING */}
       {activeSubTab === 'domains' && (
         <div className="space-y-6">
           {/* Payment Gateway Mode */}
@@ -447,7 +750,7 @@ export default function AdminSettings({ token, currentUser, onDataReset }) {
         </div>
       )}
 
-      {/* SUB-TAB 4: DATA RESET OPTION & SYSTEM MAINTENANCE */}
+      {/* SUB-TAB 5: DATA RESET OPTION & SYSTEM MAINTENANCE */}
       {activeSubTab === 'reset' && (
         <div className="space-y-6">
           <div className="rounded-3xl border border-rose-200 bg-gradient-to-r from-rose-50 via-orange-50/30 to-white p-6 shadow-xs">

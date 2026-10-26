@@ -13,6 +13,7 @@ import UserManagement from './components/UserManagement';
 import AuditLogs from './components/AuditLogs';
 import AdminSettings from './components/AdminSettings';
 import WalkInBookingModal from './components/WalkInBookingModal';
+import UserProfileModal from './components/UserProfileModal';
 
 export default function AdminApp() {
   const [token, setToken] = useState(() => sessionStorage.getItem('wdpcs_admin_token') || null);
@@ -32,6 +33,7 @@ export default function AdminApp() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isWalkInOpen, setIsWalkInOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [toastAlert, setToastAlert] = useState(null);
 
   // Audio chime for new incoming booking notifications
@@ -258,9 +260,11 @@ export default function AdminApp() {
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           {/* Logo & Society Info */}
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-2xl text-white shadow-md shadow-blue-500/20">
-              🛡️
-            </div>
+            <img
+              src="./logo.png"
+              alt="Mountain Stay Retreat Logo"
+              className="h-11 w-11 rounded-full object-contain bg-white shadow-xs border border-slate-200"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base sm:text-lg font-extrabold tracking-tight text-slate-900">
@@ -359,18 +363,25 @@ export default function AdminApp() {
               )}
             </div>
 
-            {/* Current Staff User Chip */}
-            <div className="hidden md:flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 shadow-2xs">
-              <div className="h-7 w-7 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center text-xs font-bold font-mono">
+            {/* Current Staff User Chip (Clickable to manage profile & password) */}
+            <button
+              onClick={() => setIsProfileOpen(true)}
+              title="Click to manage your profile & password"
+              className="hidden md:flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5 shadow-2xs hover:border-blue-400 hover:bg-blue-50/40 transition text-left cursor-pointer group"
+            >
+              <div className="h-7 w-7 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center text-xs font-bold font-mono group-hover:bg-blue-600 group-hover:text-white transition">
                 {currentUser.username.slice(0, 2).toUpperCase()}
               </div>
               <div className="text-left">
-                <div className="text-xs font-bold text-slate-900 leading-none">{currentUser.name}</div>
+                <div className="text-xs font-bold text-slate-900 leading-none group-hover:text-blue-700 flex items-center gap-1">
+                  <span>{currentUser.name}</span>
+                  <span className="text-[10px] text-slate-400 group-hover:text-blue-500">✏️</span>
+                </div>
                 <div className="text-[10px] text-slate-500 font-mono capitalize leading-tight mt-0.5">
                   {currentUser.role}
                 </div>
               </div>
-            </div>
+            </button>
 
             {/* Public Site Link */}
             <a
@@ -507,7 +518,18 @@ export default function AdminApp() {
         )}
 
         {activeTab === 'users' && (
-          <UserManagement token={token} currentUser={currentUser} />
+          <UserManagement
+            token={token}
+            currentUser={currentUser}
+            onUserUpdated={(updatedUser, newToken) => {
+              setCurrentUser(updatedUser);
+              sessionStorage.setItem('wdpcs_admin_user', JSON.stringify(updatedUser));
+              if (newToken) {
+                setToken(newToken);
+                sessionStorage.setItem('wdpcs_admin_token', newToken);
+              }
+            }}
+          />
         )}
 
         {activeTab === 'audit' && (
@@ -523,9 +545,33 @@ export default function AdminApp() {
               fetchBookings();
               fetchNotifications();
             }}
+            onUserUpdated={(updatedUser, newToken) => {
+              setCurrentUser(updatedUser);
+              sessionStorage.setItem('wdpcs_admin_user', JSON.stringify(updatedUser));
+              if (newToken) {
+                setToken(newToken);
+                sessionStorage.setItem('wdpcs_admin_token', newToken);
+              }
+            }}
           />
         )}
       </main>
+
+      {/* Staff Self-Profile & Password Reset Modal */}
+      <UserProfileModal
+        isOpen={isProfileOpen}
+        onClose={() => setIsProfileOpen(false)}
+        token={token}
+        currentUser={currentUser}
+        onUserUpdated={(updatedUser, newToken) => {
+          setCurrentUser(updatedUser);
+          sessionStorage.setItem('wdpcs_admin_user', JSON.stringify(updatedUser));
+          if (newToken) {
+            setToken(newToken);
+            sessionStorage.setItem('wdpcs_admin_token', newToken);
+          }
+        }}
+      />
 
       {/* Front Desk Walk-In Booking Modal */}
       <WalkInBookingModal
