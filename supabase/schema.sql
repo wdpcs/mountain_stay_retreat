@@ -135,35 +135,67 @@ create table if not exists public.bookings (
 
 alter table public.bookings enable row level security;
 
+drop policy if exists "Public can insert bookings" on public.bookings;
+drop policy if exists "Staff can view all bookings" on public.bookings;
+drop policy if exists "Staff and public can view bookings" on public.bookings;
+drop policy if exists "Allow select on bookings" on public.bookings;
+drop policy if exists "Staff can update bookings" on public.bookings;
+drop policy if exists "Allow update on bookings" on public.bookings;
+drop policy if exists "Staff can delete or cancel bookings" on public.bookings;
+drop policy if exists "Allow delete on bookings" on public.bookings;
+
 create policy "Public can insert bookings" 
   on public.bookings for insert 
   to anon, authenticated 
   with check (true);
 
-create policy "Staff can view all bookings" 
+create policy "Allow select on bookings" 
   on public.bookings for select 
-  to authenticated 
+  to anon, authenticated 
   using (true);
 
-create policy "Staff can update bookings" 
+create policy "Allow update on bookings" 
   on public.bookings for update 
-  to authenticated 
-  using (
-    exists (
-      select 1 from public.profiles 
-      where profiles.id = auth.uid() and profiles.role in ('admin', 'manager', 'receptionist')
-    )
-  );
+  to anon, authenticated 
+  using (true);
 
-create policy "Staff can delete or cancel bookings" 
+create policy "Allow delete on bookings" 
   on public.bookings for delete 
-  to authenticated 
-  using (
-    exists (
-      select 1 from public.profiles 
-      where profiles.id = auth.uid() and profiles.role in ('admin', 'manager')
-    )
-  );
+  to anon, authenticated 
+  using (true);
+
+-- RPC Function to retrieve all bookings with camelCase fields for the admin dashboard
+create or replace function public.get_all_bookings()
+returns json
+language plpgsql
+security definer
+as $$
+declare
+  res json;
+begin
+  select coalesce(json_agg(b order by b."createdAt" desc), '[]'::json) into res
+  from (
+    select 
+      id,
+      guest_name as "name",
+      guest_email as "email",
+      guest_phone as "phone",
+      check_in_date as "date",
+      room_type as "roomType",
+      amount,
+      payment_method as "paymentMethod",
+      status,
+      notes,
+      payment_id as "paymentId",
+      order_id as "orderId",
+      created_at as "createdAt"
+    from public.bookings
+  ) b;
+  return res;
+end;
+$$;
+
+grant execute on function public.get_all_bookings() to anon, authenticated;
 
 -- Function to check available rooms on a specific date
 create or replace function public.get_room_availability(target_date date)

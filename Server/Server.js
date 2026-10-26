@@ -269,7 +269,7 @@ let societySettings = {
     'Full refund if cancelled at least 24 hours prior to check-in date. Cancellations within 24 hours incur 1-night retention charges.',
 };
 
-// Dynamic transactional stores (initialized empty, storing real activity only)
+// Dynamic transactional stores (synchronized with Supabase Cloud)
 let bookings = [];
 let transactions = [];
 let refunds = [];
@@ -283,11 +283,153 @@ let auditLogs = [
     action: 'SYSTEM_INITIALIZATION',
     targetType: 'System',
     targetId: 'W208',
-    details: 'WDPCS Accommodation system initialized with clean default values.',
+    details: 'WDPCS Accommodation system initialized with live database sync.',
     ip: '127.0.0.1',
   },
 ];
 let notifications = [];
+
+// ==========================================
+// SUPABASE CLOUD DATABASE ADAPTER
+// ==========================================
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || '';
+
+function isSupabaseConfigured() {
+  return (
+    Boolean(SUPABASE_URL) &&
+    Boolean(SUPABASE_KEY) &&
+    !SUPABASE_URL.includes('your-project-id')
+  );
+}
+
+function formatBookingFromDB(b) {
+  return {
+    id: b.id,
+    name: b.name || b.guest_name || '',
+    email: b.email || b.guest_email || '',
+    phone: b.phone || b.guest_phone || '',
+    date: b.date || b.check_in_date || '',
+    roomType: b.roomType || b.room_type || '',
+    amount: Number(b.amount) || 0,
+    paymentMethod: b.paymentMethod || b.payment_method || 'Pay at Counter / Property',
+    status: b.status || 'Pending at Check-in',
+    notes: b.notes || '',
+    paymentId: b.paymentId || b.payment_id || null,
+    orderId: b.orderId || b.order_id || null,
+    createdAt: b.createdAt || b.created_at || new Date().toISOString(),
+  };
+}
+
+async function syncWithSupabase() {
+  if (!isSupabaseConfigured()) return;
+  try {
+    // 1. Try RPC get_all_bookings first
+    const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_all_bookings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+    });
+
+    if (rpcRes.ok) {
+      const data = await rpcRes.json();
+      if (Array.isArray(data)) {
+        bookings = data.map(formatBookingFromDB);
+        return;
+      }
+    }
+
+    // 2. Direct table select fallback
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/bookings?select=*&order=created_at.desc`, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        bookings = data.map(formatBookingFromDB);
+      }
+    }
+  } catch (err) {
+    console.warn('Supabase sync notice:', err.message);
+  }
+}
+
+async function syncBookingToSupabase(record) {
+  if (!isSupabaseConfigured()) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify({
+        id: record.id,
+        guest_name: record.name,
+        guest_email: record.email,
+        guest_phone: record.phone,
+        check_in_date: record.date,
+        room_type: record.roomType,
+        amount: record.amount,
+        payment_method: record.paymentMethod,
+        status: record.status,
+        notes: record.notes || '',
+        payment_id: record.paymentId || null,
+        order_id: record.orderId || null,
+        created_at: record.createdAt || new Date().toISOString(),
+      }),
+    });
+  } catch (err) {
+    console.warn('Sync booking to Supabase notice:', err.message);
+  }
+}
+
+async function syncBookingStatusToSupabase(bookingId, newStatus, notes) {
+  if (!isSupabaseConfigured()) return;
+  try {
+    const updateBody = { status: newStatus };
+    if (notes !== undefined) updateBody.notes = notes;
+    await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${bookingId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        Prefer: 'return=minimal',
+      },
+      body: JSON.stringify(updateBody),
+    });
+  } catch (err) {
+    console.warn('Sync booking update to Supabase notice:', err.message);
+  }
+}
+
+async function deleteBookingFromSupabase(bookingId) {
+  if (!isSupabaseConfigured()) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${bookingId}`, {
+      method: 'DELETE',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+    });
+  } catch (err) {
+    console.warn('Delete booking from Supabase notice:', err.message);
+  }
+}
+
+// Initial sync on startup
+syncWithSupabase();
 
 function logAuditEvent(adminUser, action, targetType, targetId, details, req) {
   const logEntry = {
