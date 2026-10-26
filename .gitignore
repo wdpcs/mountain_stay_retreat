@@ -19,6 +19,7 @@ Server/staff_users.json
 admin/.env
 admin/.env.*
 !.env.example
+!.env.production.example
 !Server/.env.example
 !admin/.env.example
 
