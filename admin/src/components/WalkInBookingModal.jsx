@@ -50,7 +50,9 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
         onClose();
         return;
       }
-    } catch {}
+    } catch {
+      // Fallback to Supabase direct insert below
+    }
 
     // 2. Direct Supabase Cloud Fallback
     try {

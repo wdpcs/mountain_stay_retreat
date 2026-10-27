@@ -161,7 +161,9 @@ export default function AdminApp() {
         setBookings(data.bookings || []);
         return;
       }
-    } catch {}
+    } catch {
+      // Fallback: Query Supabase Cloud direct below
+    }
 
     // Fallback: Query Supabase Cloud direct
     try {
@@ -209,7 +211,9 @@ export default function AdminApp() {
             setUnreadCount(data.unreadCount || 0);
           }
         }
-      } catch {}
+      } catch {
+        // Notification fetch failure tolerated if server offline
+      }
     },
     [token, playAlertChime]
   );
@@ -227,7 +231,9 @@ export default function AdminApp() {
         body: JSON.stringify({ status: newStatus }),
       });
       if (res.ok) updated = true;
-    } catch {}
+    } catch {
+      // Backend unreachable, fallback to Supabase direct below
+    }
 
     if (!updated) {
       try {
@@ -265,7 +271,9 @@ export default function AdminApp() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) deleted = true;
-    } catch {}
+    } catch {
+      // Backend unreachable, fallback to Supabase direct below
+    }
 
     if (!deleted) {
       try {
