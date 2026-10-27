@@ -21,14 +21,21 @@ export default function ContactSection() {
               📞
             </div>
             <h4 className="mb-2 text-lg font-bold text-slate-900">Phone & Reception</h4>
-            <div className="space-y-1 font-semibold text-slate-600">
-              <div>
-                <a href="tel:+917025017611" className="hover:text-blue-600 transition">
+            <div className="space-y-2 text-left font-semibold text-slate-600 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-normal">Reception (24x7):</span>
+                <a href="tel:+917025017611" className="hover:text-blue-600 font-bold transition text-sm">
                   +91 70250 17611
                 </a>
               </div>
-              <div className="text-xs text-slate-500 font-normal">
-                Available 24x7 for guest support
+              <div className="flex items-center justify-between border-t border-slate-100 pt-1.5">
+                <span className="text-slate-500 font-normal">Manager:</span>
+                <a href="tel:+918301995940" className="hover:text-blue-600 font-bold transition text-sm">
+                  +91 83019 95940
+                </a>
+              </div>
+              <div className="text-[11px] text-slate-400 font-normal text-center pt-1">
+                Available daily for guest inquiries & booking support
               </div>
             </div>
           </div>
@@ -48,19 +55,21 @@ export default function ContactSection() {
           </div>
 
           {/* Location Card */}
-          <div className="rounded-3xl bg-white p-8 shadow-sm text-center border border-slate-200/60">
-            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-2xl text-blue-600">
-              📍
+          <div className="rounded-3xl bg-white p-8 shadow-sm text-center border border-slate-200/60 flex flex-col justify-between">
+            <div>
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-2xl text-blue-600">
+                📍
+              </div>
+              <h4 className="mb-2 text-lg font-bold text-slate-900">Retreat Location</h4>
+              <p className="text-slate-700 font-medium text-xs sm:text-sm leading-relaxed mb-3">
+                Kalpetta North Post, Opposite to Skyface Apartment, SP office Road, Wayanad, Kerala - 673122
+              </p>
             </div>
-            <h4 className="mb-2 text-lg font-bold text-slate-900">Retreat Location</h4>
-            <p className="text-slate-600 font-semibold text-sm mb-2">
-              Mananthavady, Wayanad, Kerala 670645
-            </p>
             <a
-              href="https://maps.app.goo.gl/WFbhoSgQYqwQSdL96"
+              href="https://maps.google.com/?q=Opposite+to+Skyface+Apartment,+SP+office+Road,+Kalpetta+North,+Wayanad,+Kerala+673122"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 underline"
+              className="inline-flex items-center justify-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 underline"
             >
               Open in Google Maps ↗
             </a>
@@ -79,7 +88,7 @@ export default function ContactSection() {
               </p>
             </div>
             <a
-              href="https://maps.app.goo.gl/WFbhoSgQYqwQSdL96"
+              href="https://maps.google.com/?q=Opposite+to+Skyface+Apartment,+SP+office+Road,+Kalpetta+North,+Wayanad,+Kerala+673122"
               target="_blank"
               rel="noopener noreferrer"
               className="mt-3 sm:mt-0 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-sm transition hover:bg-blue-700"
@@ -92,7 +101,7 @@ export default function ContactSection() {
           <div className="relative h-80 sm:h-96 w-full bg-slate-100">
             <iframe
               title="Mountain Stay Retreat Location Map"
-              src="https://maps.google.com/maps?q=Mountain+Stay+Retreat,+Kerala&t=&z=13&ie=UTF8&iwloc=&output=embed"
+              src="https://maps.google.com/maps?q=Opposite+to+Skyface+Apartment,+SP+office+Road,+Kalpetta+North,+Wayanad,+Kerala+673122&t=&z=14&ie=UTF8&iwloc=&output=embed"
               width="100%"
               height="100%"
               style={{ border: 0 }}

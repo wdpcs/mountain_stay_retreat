@@ -5,9 +5,10 @@ import UserManagement from './UserManagement';
 const DEFAULT_SETTINGS = {
   societyName: 'Wayanad District Police Co-operative Society Ltd. No. W 208',
   property: 'Mountain Stay Retreat',
-  address: 'Mananthavady, Wayanad, Kerala 670645',
+  address:
+    'Kalpetta North Post, Opposite to Skyface Apartment, SP office Road, Wayanad, Kerala. 673122',
   receptionPhone: '+91 70250 17611',
-  managerPhone: '+91 98450 12345',
+  managerPhone: '+91 83019 95940',
   checkInTime: '13:00',
   checkOutTime: '12:00',
   razorpayMode: 'hold',
@@ -73,7 +74,15 @@ export default function AdminSettings({ token, currentUser, onDataReset, onUserU
       if (sbRes.ok) {
         const rows = await sbRes.json();
         if (rows && rows.length > 0) {
-          setSettings((prev) => ({ ...prev, ...rows[0] }));
+          const r = rows[0];
+          setSettings((prev) => ({
+            ...prev,
+            ...r,
+            address:
+              r.address ||
+              'Kalpetta North Post, Opposite to Skyface Apartment, SP office Road, Wayanad, Kerala. 673122',
+            managerPhone: r.manager_phone === '+91 98450 12345' ? '+91 83019 95940' : (r.manager_phone || '+91 83019 95940'),
+          }));
         }
       }
     } catch {

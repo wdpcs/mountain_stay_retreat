@@ -83,7 +83,7 @@ export default function UserManagement({ token, currentUser, onUserUpdated }) {
         name: 'Operations Manager',
         role: 'manager',
         email: 'manager@wdpcs.in',
-        phone: '+91 98450 12345',
+        phone: '+91 83019 95940',
         active: true,
         createdAt: '2026-01-01T00:00:00.000Z',
       },

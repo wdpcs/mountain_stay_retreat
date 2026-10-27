@@ -10,9 +10,11 @@ export const SUPABASE_KEY =
 export const SOCIETY_INFO = {
   name: 'Wayanad District Police Co-operative Society Ltd. No. W 208',
   property: 'Mountain Stay Retreat',
-  location: 'Mananthavady, Wayanad, Kerala 670645',
+  location:
+    'Kalpetta North Post, Opposite to Skyface Apartment, SP office Road, Wayanad, Kerala. 673122',
   contactPhone: '+91 70250 17611',
-  receptionPhone: '+91 98450 12345',
+  managerPhone: '+91 83019 95940',
+  receptionPhone: '+91 70250 17611',
   domains: {
     guest: 'https://rooms.wdpcs.in',
     admin: 'https://roomsadmin.wdpcs.in',

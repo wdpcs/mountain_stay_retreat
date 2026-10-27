@@ -226,7 +226,7 @@ const DEFAULT_STAFF_USERS = [
     role: 'manager',
     passwordHash: hashPassword('manager123'),
     email: 'manager@wdpcs.in',
-    phone: '+91 98450 12345',
+    phone: '+91 83019 95940',
     active: true,
     createdAt: '2026-01-15T00:00:00Z',
   },
@@ -288,9 +288,10 @@ let maintenanceStatus = {
 let societySettings = {
   societyName: 'Wayanad District Police Co-operative Society Ltd. No. W 208',
   property: 'Mountain Stay Retreat',
-  address: 'Mananthavady, Wayanad, Kerala 670645',
+  address:
+    'Kalpetta North Post, Opposite to Skyface Apartment, SP office Road, Wayanad, Kerala. 673122',
   receptionPhone: '+91 70250 17611',
-  managerPhone: '+91 98450 12345',
+  managerPhone: '+91 83019 95940',
   checkInTime: '13:00',
   checkOutTime: '12:00',
   razorpayMode: 'hold',
