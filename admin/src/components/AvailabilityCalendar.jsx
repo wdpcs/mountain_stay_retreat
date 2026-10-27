@@ -1,10 +1,63 @@
 import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 
-export default function AvailabilityCalendar({ token }) {
+export default function AvailabilityCalendar({ token, bookings = [] }) {
   const [calendarDays, setCalendarDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState(null);
+
+  const computeFallbackCalendar = useCallback(() => {
+    const today = new Date();
+    const daysList = [];
+
+    let savedMaint = { maintenanceSuites: 0, maintenanceDormBeds: 0 };
+    try {
+      const localMaint = localStorage.getItem('wdpcs_maintenance_status');
+      if (localMaint) savedMaint = JSON.parse(localMaint);
+    } catch {
+      // Default fallback
+    }
+
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+
+      const dayBookings = (bookings || []).filter(
+        (b) => b.date === dateStr && b.status !== 'Cancelled'
+      );
+      const suitesBooked = dayBookings.filter((b) => (b.roomType || '').includes('Suite')).length;
+      const dormBooked = dayBookings.filter((b) => (b.roomType || '').includes('Dormitory')).length;
+
+      const suitesAvailable = Math.max(0, 5 - suitesBooked - (savedMaint.maintenanceSuites || 0));
+      const dormAvailable = Math.max(0, 15 - dormBooked - (savedMaint.maintenanceDormBeds || 0));
+
+      daysList.push({
+        date: dateStr,
+        dayName: d.toLocaleDateString('en-US', { weekday: 'short' }),
+        suitesBooked,
+        suitesAvailable,
+        totalSuites: 5,
+        dormBooked,
+        dormAvailable,
+        totalDormBeds: 15,
+        hasMaintenance: (savedMaint.maintenanceSuites || 0) > 0 || (savedMaint.maintenanceDormBeds || 0) > 0,
+        bookings: dayBookings.map((b) => ({
+          id: b.id,
+          name: b.name,
+          roomType: b.roomType,
+          status: b.status,
+          phone: b.phone,
+          amount: b.amount,
+        })),
+      });
+    }
+
+    setCalendarDays(daysList);
+    if (daysList.length > 0) {
+      setSelectedDay((prev) => (prev ? daysList.find((c) => c.date === prev.date) || daysList[0] : daysList[0]));
+    }
+  }, [bookings]);
 
   const fetchCalendar = useCallback(async () => {
     try {
@@ -13,23 +66,25 @@ export default function AvailabilityCalendar({ token }) {
       });
       if (res.ok) {
         const data = await res.json();
-        setCalendarDays(data.calendar || []);
         if (data.calendar && data.calendar.length > 0) {
-          setSelectedDay(data.calendar[0]);
+          setCalendarDays(data.calendar);
+          setSelectedDay((prev) => (prev ? data.calendar.find((c) => c.date === prev.date) || data.calendar[0] : data.calendar[0]));
+          return;
         }
       }
-    } catch (err) {
-      console.error('Failed to fetch calendar:', err);
-    } finally {
-      setLoading(false);
+    } catch {
+      // Fallback below
     }
-  }, [token]);
+
+    computeFallbackCalendar();
+    setLoading(false);
+  }, [token, computeFallbackCalendar]);
 
   useEffect(() => {
     fetchCalendar();
   }, [fetchCalendar]);
 
-  if (loading) {
+  if (loading && calendarDays.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-t-transparent"></div>

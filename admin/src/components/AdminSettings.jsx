@@ -1,10 +1,23 @@
 import { useState, useEffect, useCallback } from 'react';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL, SUPABASE_URL, SUPABASE_KEY } from '../config';
 import UserManagement from './UserManagement';
+
+const DEFAULT_SETTINGS = {
+  societyName: 'Wayanad District Police Co-operative Society Ltd. No. W 208',
+  property: 'Mountain Stay Retreat',
+  address: 'Mananthavady, Wayanad, Kerala 670645',
+  receptionPhone: '+91 70250 17611',
+  managerPhone: '+91 98450 12345',
+  checkInTime: '13:00',
+  checkOutTime: '12:00',
+  razorpayMode: 'test',
+  cancellationPolicy:
+    'Full refund if cancelled at least 24 hours prior to check-in date. Cancellations within 24 hours incur 1-night retention charges.',
+};
 
 export default function AdminSettings({ token, currentUser, onDataReset, onUserUpdated }) {
   const [activeSubTab, setActiveSubTab] = useState('profile');
-  const [settings, setSettings] = useState(null);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,10 +53,31 @@ export default function AdminSettings({ token, currentUser, onDataReset, onUserU
       });
       if (res.ok) {
         const data = await res.json();
-        setSettings(data.settings);
+        if (data.settings) {
+          setSettings(data.settings);
+          setLoading(false);
+          return;
+        }
       }
-    } catch (err) {
-      console.error('Failed to fetch settings:', err);
+    } catch {
+      // Fallback below
+    }
+
+    try {
+      const sbRes = await fetch(`${SUPABASE_URL}/rest/v1/property_settings?select=*&limit=1`, {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      });
+      if (sbRes.ok) {
+        const rows = await sbRes.json();
+        if (rows && rows.length > 0) {
+          setSettings((prev) => ({ ...prev, ...rows[0] }));
+        }
+      }
+    } catch {
+      // Retain DEFAULT_SETTINGS
     } finally {
       setLoading(false);
     }
@@ -204,7 +238,7 @@ export default function AdminSettings({ token, currentUser, onDataReset, onUserU
     }
   };
 
-  if (loading || !settings) {
+  if (loading && !settings) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-t-transparent"></div>

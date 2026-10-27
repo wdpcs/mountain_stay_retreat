@@ -1,9 +1,46 @@
 import { useState, useEffect, useCallback } from 'react';
 import { API_BASE_URL, SOCIETY_INFO } from '../config';
 
-export default function ReportsExports({ token }) {
+export default function ReportsExports({ token, bookings = [] }) {
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const computeFallbackReport = useCallback(() => {
+    const totalBookings = (bookings || []).length;
+    const activeBookings = (bookings || []).filter((b) => b.status !== 'Cancelled');
+    const cancelledBookings = (bookings || []).filter((b) => b.status === 'Cancelled');
+    const totalRevenue = activeBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
+
+    const suiteBookings = activeBookings.filter((b) => (b.roomType || '').includes('Suite'));
+    const dormBookings = activeBookings.filter((b) => (b.roomType || '').includes('Dormitory'));
+
+    const suiteRevenue = suiteBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
+    const dormRevenue = dormBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
+
+    const onlineBookings = activeBookings.filter((b) => (b.paymentMethod || '').includes('Online'));
+    const counterBookings = activeBookings.filter((b) => (b.paymentMethod || '').includes('Counter'));
+
+    const fallbackReport = {
+      generatedAt: new Date().toISOString(),
+      summary: {
+        totalBookings,
+        activeBookings: activeBookings.length,
+        cancelledBookings: cancelledBookings.length,
+        totalRevenue,
+        averageBookingValue: activeBookings.length ? Math.round(totalRevenue / activeBookings.length) : 0,
+      },
+      byRoom: {
+        suites: { count: suiteBookings.length, revenue: suiteRevenue },
+        dormitory: { count: dormBookings.length, revenue: dormRevenue },
+      },
+      byPayment: {
+        online: { count: onlineBookings.length, revenue: onlineBookings.reduce((s, b) => s + (b.amount || 0), 0) },
+        counter: { count: counterBookings.length, revenue: counterBookings.reduce((s, b) => s + (b.amount || 0), 0) },
+      },
+      bookingsRoster: bookings || [],
+    };
+    setReport(fallbackReport);
+  }, [bookings]);
 
   const fetchReports = useCallback(async () => {
     try {
@@ -12,14 +49,18 @@ export default function ReportsExports({ token }) {
       });
       if (res.ok) {
         const data = await res.json();
-        setReport(data);
+        if (data.summary) {
+          setReport(data);
+          return;
+        }
       }
-    } catch (err) {
-      console.error('Failed to fetch reports:', err);
-    } finally {
-      setLoading(false);
+    } catch {
+      // Fallback below
     }
-  }, [token]);
+
+    computeFallbackReport();
+    setLoading(false);
+  }, [token, computeFallbackReport]);
 
   useEffect(() => {
     fetchReports();
@@ -147,7 +188,7 @@ export default function ReportsExports({ token }) {
     printWindow.document.close();
   };
 
-  if (loading || !report) {
+  if (loading && !report) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-t-transparent"></div>

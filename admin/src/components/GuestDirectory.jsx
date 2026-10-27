@@ -1,11 +1,49 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 
-export default function GuestDirectory({ token }) {
+export default function GuestDirectory({ token, bookings = [] }) {
   const [guests, setGuests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedGuest, setSelectedGuest] = useState(null);
+
+  const computeFallbackGuests = useCallback(() => {
+    const guestMap = new Map();
+    (bookings || []).forEach((b) => {
+      const key = b.email || b.phone || b.name;
+      if (!key) return;
+      if (!guestMap.has(key)) {
+        guestMap.set(key, {
+          name: b.name,
+          email: b.email,
+          phone: b.phone,
+          totalBookings: 0,
+          totalSpent: 0,
+          lastVisit: b.date,
+          history: [],
+        });
+      }
+
+      const g = guestMap.get(key);
+      g.totalBookings += 1;
+      if (b.status !== 'Cancelled') {
+        g.totalSpent += b.amount || 0;
+      }
+      if (!g.lastVisit || b.date > g.lastVisit) {
+        g.lastVisit = b.date;
+      }
+      g.history.push({
+        id: b.id,
+        date: b.date,
+        roomType: b.roomType,
+        amount: b.amount,
+        status: b.status,
+      });
+    });
+
+    const guestList = Array.from(guestMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+    setGuests(guestList);
+  }, [bookings]);
 
   const fetchGuests = useCallback(async () => {
     try {
@@ -14,14 +52,18 @@ export default function GuestDirectory({ token }) {
       });
       if (res.ok) {
         const data = await res.json();
-        setGuests(data.guests || []);
+        if (data.guests) {
+          setGuests(data.guests);
+          return;
+        }
       }
-    } catch (err) {
-      console.error('Failed to fetch guests:', err);
-    } finally {
-      setLoading(false);
+    } catch {
+      // Fallback below
     }
-  }, [token]);
+
+    computeFallbackGuests();
+    setLoading(false);
+  }, [token, computeFallbackGuests]);
 
   useEffect(() => {
     fetchGuests();
@@ -38,7 +80,7 @@ export default function GuestDirectory({ token }) {
     );
   }, [guests, search]);
 
-  if (loading) {
+  if (loading && guests.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-3 border-blue-600 border-t-transparent"></div>

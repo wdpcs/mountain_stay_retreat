@@ -601,6 +601,7 @@ export default function AdminApp() {
         {activeTab === 'inventory' && (
           <RoomInventory
             token={token}
+            bookings={bookings}
             onPricesUpdated={() => {
               fetchStats();
               fetchBookings();
@@ -609,15 +610,15 @@ export default function AdminApp() {
         )}
 
         {activeTab === 'calendar' && (
-          <AvailabilityCalendar token={token} />
+          <AvailabilityCalendar token={token} bookings={bookings} />
         )}
 
         {activeTab === 'guests' && (
-          <GuestDirectory token={token} />
+          <GuestDirectory token={token} bookings={bookings} />
         )}
 
         {activeTab === 'payments' && (
-          <PaymentMonitor token={token} />
+          <PaymentMonitor token={token} bookings={bookings} />
         )}
 
         {activeTab === 'refunds' && (
@@ -632,7 +633,7 @@ export default function AdminApp() {
         )}
 
         {activeTab === 'reports' && (
-          <ReportsExports token={token} />
+          <ReportsExports token={token} bookings={bookings} />
         )}
 
         {activeTab === 'users' && (
