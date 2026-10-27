@@ -356,23 +356,23 @@ export default function BookingWizard({
                   </div>
                 </div>
 
-                {/* Coming Soon: Razorpay */}
-                <div className="relative rounded-2xl border border-slate-200 bg-slate-50/80 p-5 opacity-60 cursor-not-allowed select-none">
+                {/* Razorpay Integration: Temporarily On Hold */}
+                <div className="relative rounded-2xl border border-amber-200/80 bg-amber-50/40 p-5 select-none">
                   <div className="flex items-start gap-3.5">
-                    <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-400 text-xs font-bold">
-                      ✕
+                    <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700 text-xs font-bold border border-amber-300">
+                      ⏸️
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center justify-between">
-                        <h5 className="font-semibold text-slate-500">
+                        <h5 className="font-semibold text-slate-700">
                           💳 Online Pre-payment (Razorpay)
                         </h5>
-                        <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                          Supabase Edge Sync
+                        <span className="rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
+                          Temporarily On Hold
                         </span>
                       </div>
-                      <p className="mt-1 text-xs leading-relaxed text-slate-500">
-                        Online payment gateway will activate as soon as Razorpay API keys are configured in Supabase Edge Functions.
+                      <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                        Online gateway transactions are temporarily on hold. You can reserve your room immediately with zero prepayment — settle conveniently via UPI QR or Cash at the front desk upon arrival.
                       </p>
                     </div>
                   </div>

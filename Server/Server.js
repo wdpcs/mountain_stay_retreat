@@ -293,7 +293,7 @@ let societySettings = {
   managerPhone: '+91 98450 12345',
   checkInTime: '13:00',
   checkOutTime: '12:00',
-  razorpayMode: 'test',
+  razorpayMode: 'hold',
   cancellationPolicy:
     'Full refund if cancelled at least 24 hours prior to check-in date. Cancellations within 24 hours incur 1-night retention charges.',
 };
@@ -654,6 +654,13 @@ app.post('/book-counter', async (req, res) => {
 
 // Razorpay Order creation (Key Secret is NEVER returned)
 app.post('/create-order', async (req, res) => {
+  if (societySettings.razorpayMode === 'hold') {
+    return res.status(503).json({
+      success: false,
+      error: 'Online Razorpay payment integration is temporarily on hold. Please reserve using Pay at Counter.',
+      paused: true,
+    });
+  }
   try {
     const { amount } = req.body;
     if (!amount || isNaN(Number(amount))) {

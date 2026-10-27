@@ -10,7 +10,7 @@ const DEFAULT_SETTINGS = {
   managerPhone: '+91 98450 12345',
   checkInTime: '13:00',
   checkOutTime: '12:00',
-  razorpayMode: 'test',
+  razorpayMode: 'hold',
   cancellationPolicy:
     'Full refund if cancelled at least 24 hours prior to check-in date. Cancellations within 24 hours incur 1-night retention charges.',
 };
@@ -721,10 +721,11 @@ export default function AdminSettings({ token, currentUser, onDataReset, onUserU
                 </label>
                 <select
                   disabled={!isSuperAdmin}
-                  value={settings.razorpayMode || 'test'}
+                  value={settings.razorpayMode || 'hold'}
                   onChange={(e) => setSettings({ ...settings, razorpayMode: e.target.value })}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition disabled:opacity-60 font-bold"
                 >
+                  <option value="hold">⏸️ Temporarily On Hold / Paused (Counter & UPI Only)</option>
                   <option value="test">Sandbox Test Mode (Simulated Payments)</option>
                   <option value="live">Live Production Gateway (Real Transactions)</option>
                 </select>

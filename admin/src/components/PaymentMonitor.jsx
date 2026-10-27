@@ -98,9 +98,9 @@ export default function PaymentMonitor({ token, bookings = [] }) {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <span className="rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 flex items-center gap-1.5 shadow-2xs">
-            <span className="h-2 w-2 rounded-full bg-emerald-600"></span>
-            Razorpay Gateway Connected
+          <span className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-800 flex items-center gap-1.5 shadow-2xs">
+            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
+            Razorpay On Hold (Counter/UPI Active)
           </span>
           <button
             onClick={fetchTransactions}
