@@ -16,6 +16,7 @@ dist-ssr
 Server/.env
 Server/.env.*
 Server/staff_users.json
+Server/flexi_rates.json
 admin/.env
 admin/.env.*
 !.env.example
