@@ -67,13 +67,23 @@ export default function BookingModal({ bookingConfirmation, onClose }) {
           </div>
         </div>
 
-        <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50/80 p-3.5 text-xs text-blue-900 flex items-start gap-2.5">
-          <span className="text-base shrink-0">🛎️</span>
-          <div>
-            <strong className="block font-semibold">Front Desk Reservation Alert:</strong>
-            <span>Mountain Stay Retreat front desk has recorded your reservation. Please show your Booking ID at check-in.</span>
+        {bookingConfirmation.syncedToCloud === false ? (
+          <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 p-3.5 text-xs text-amber-900 flex items-start gap-2.5">
+            <span className="text-base shrink-0">⚠️</span>
+            <div>
+              <strong className="block font-semibold">Offline Notice:</strong>
+              <span>Cloud database sync pending. Please click below to send your Booking ID to reception via WhatsApp so room readiness can be confirmed immediately.</span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mb-4 rounded-2xl border border-emerald-300 bg-emerald-50/90 p-3.5 text-xs text-emerald-900 flex items-start gap-2.5">
+            <span className="text-base shrink-0">✅</span>
+            <div>
+              <strong className="block font-semibold">Confirmed & Synchronized with Reception:</strong>
+              <span>Mountain Stay Retreat front desk has recorded your reservation in the central system. Please show your Booking ID at check-in.</span>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-2.5">
           <a

@@ -509,7 +509,7 @@ async function syncWithSupabase() {
 
     if (rpcRes.ok) {
       const data = await rpcRes.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         bookings = data.map(formatBookingFromDB);
         return;
       }
@@ -525,7 +525,7 @@ async function syncWithSupabase() {
 
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         bookings = data.map(formatBookingFromDB);
       }
     }

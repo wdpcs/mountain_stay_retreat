@@ -3,8 +3,10 @@
  * Designed for static hosting on GitHub Pages without requiring a Node.js server.
  */
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL || 'https://djbizcrfqqurtfwiivds.supabase.co';
+const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_l3CBp7BV49BdGVfsOKQ2HA_3vXO3eP8';
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export const isSupabaseConfigured = () => {
@@ -186,6 +188,9 @@ export async function submitCounterBooking(bookingData) {
 
       if (res.ok) {
         return { success: true, bookingId, syncedToCloud: true };
+      } else {
+        const errorText = await res.text();
+        console.error('Supabase booking sync error response:', res.status, errorText);
       }
     } catch (err) {
       console.warn('Supabase booking sync failed (saved locally):', err);
