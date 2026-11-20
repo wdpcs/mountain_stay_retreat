@@ -315,3 +315,125 @@ export async function submitOnlineBooking(bookingData) {
 
   return { success: true, bookingId };
 }
+
+/**
+ * Look up an existing reservation by Booking ID, phone number, or email.
+ */
+export async function lookupBooking(searchQuery) {
+  if (!searchQuery || !searchQuery.trim()) return [];
+  const q = searchQuery.trim();
+  const lowerQ = q.toLowerCase();
+
+  // 1. Check Supabase Cloud database
+  if (isSupabaseConfigured()) {
+    try {
+      const cleanPhone = q.replace(/\D/g, '');
+      const filterConditions = [
+        `id.ilike.*${encodeURIComponent(q)}*`,
+        `guest_email.ilike.*${encodeURIComponent(q)}*`,
+        `guest_name.ilike.*${encodeURIComponent(q)}*`,
+      ];
+      if (cleanPhone.length >= 5) {
+        filterConditions.push(`guest_phone.ilike.*${encodeURIComponent(cleanPhone)}*`);
+      }
+      const url = `${SUPABASE_URL}/rest/v1/bookings?or=(${filterConditions.join(',')})&order=created_at.desc&limit=10`;
+      const res = await fetch(url, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        },
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          return data.map((b) => {
+            const checkIn = b.check_in_date || b.checkInDate || b.date || '';
+            let checkOut = b.check_out_date || b.checkOutDate || '';
+            let nights = Number(b.nights) || 0;
+            const notes = b.notes || '';
+
+            if (!checkOut && notes.includes('Stay:')) {
+              const stayMatch = notes.match(/Stay:\s*([0-9-]+)\s*to\s*([0-9-]+)\s*\((\d+)\s*night/i);
+              if (stayMatch) {
+                checkOut = stayMatch[2];
+                nights = Number(stayMatch[3]) || 1;
+              }
+            }
+
+            if (checkIn && checkOut && !nights) {
+              const d1 = new Date(checkIn + 'T00:00:00');
+              const d2 = new Date(checkOut + 'T00:00:00');
+              const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+              nights = diff > 0 ? diff : 1;
+            }
+            if (!nights) nights = 1;
+
+            return {
+              bookingId: b.id,
+              id: b.id,
+              name: b.guest_name || b.name || '',
+              email: b.guest_email || b.email || '',
+              phone: b.guest_phone || b.phone || '',
+              date: checkIn,
+              checkInDate: checkIn,
+              checkOutDate: checkOut,
+              nights,
+              roomType: b.room_type || b.roomType || '',
+              amount: Number(b.amount) || 0,
+              paymentMethod: b.payment_method || b.paymentMethod || 'Pay at Counter / Property',
+              status: b.status || 'Pending at Check-in',
+              notes,
+              createdAt: b.created_at || b.createdAt || '',
+            };
+          });
+        }
+      }
+    } catch (err) {
+      console.warn('Supabase lookup error:', err);
+    }
+  }
+
+  // 2. Check localStorage fallback
+  try {
+    const local = getLocalBookings();
+    const matched = local.filter((b) => {
+      const bId = (b.id || '').toLowerCase();
+      const bPhone = (b.phone || '').replace(/\D/g, '');
+      const bEmail = (b.email || '').toLowerCase();
+      const bName = (b.name || '').toLowerCase();
+      const cleanQ = q.replace(/\D/g, '');
+
+      return (
+        bId.includes(lowerQ) ||
+        bEmail.includes(lowerQ) ||
+        bName.includes(lowerQ) ||
+        (cleanQ.length >= 5 && bPhone.includes(cleanQ))
+      );
+    });
+
+    if (matched.length > 0) {
+      return matched.map((b) => ({
+        bookingId: b.id,
+        id: b.id,
+        name: b.name,
+        email: b.email,
+        phone: b.phone,
+        date: b.checkInDate || b.date,
+        checkInDate: b.checkInDate || b.date,
+        checkOutDate: b.checkOutDate,
+        nights: b.nights || 1,
+        roomType: b.roomType,
+        amount: b.amount,
+        paymentMethod: b.paymentMethod,
+        status: b.status,
+        notes: b.notes,
+        createdAt: b.createdAt,
+      }));
+    }
+  } catch {
+    // Ignore
+  }
+
+  return [];
+}

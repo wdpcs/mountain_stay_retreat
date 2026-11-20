@@ -80,21 +80,52 @@ function calculateStatsFromBookings(bookingList) {
   const activeBookings = bookingList.filter((b) => b.status !== 'Cancelled' && b.status !== 'Refunded');
   const checkedIn = bookingList.filter((b) => b.status === 'Checked In');
   const todayStr = new Date().toISOString().split('T')[0];
-  const todayArrivals = activeBookings.filter((b) => b.date === todayStr);
+  const todayCheckIns = activeBookings.filter((b) => (b.checkInDate || b.date) === todayStr);
 
   const totalRevenue = activeBookings.reduce((sum, b) => sum + (b.amount || 0), 0);
   const counterBookings = activeBookings.filter((b) => !b.paymentMethod?.toLowerCase().includes('online') && !b.paymentMethod?.toLowerCase().includes('razorpay'));
   const onlineBookings = activeBookings.filter((b) => b.paymentMethod?.toLowerCase().includes('online') || b.paymentMethod?.toLowerCase().includes('razorpay'));
 
-  const todaySuites = activeBookings.filter((b) => b.date === todayStr && b.roomType.includes('Suite')).length;
-  const todayDormBeds = activeBookings.filter((b) => b.date === todayStr && b.roomType.includes('Dormitory')).length;
+  const todaySuites = activeBookings.filter((b) => (b.checkInDate || b.date) === todayStr && b.roomType.includes('Suite')).length;
+  const todayDormBeds = activeBookings.filter((b) => (b.checkInDate || b.date) === todayStr && b.roomType.includes('Dormitory')).length;
+
+  const totalCapacity = 20; // 5 suites + 15 dorm beds
+  const totalOccupied = checkedIn.length + todayCheckIns.length;
+  const occupancyPercentage = Math.round((Math.min(totalCapacity, totalOccupied) / totalCapacity) * 100);
+
+  const pendingBookings = bookingList.filter((b) => (b.status || '').includes('Pending')).length;
+  const confirmedBookings = bookingList.filter((b) => b.status === 'Paid Online' || b.status === 'Paid at Counter' || b.status === 'Checked In').length;
 
   return {
+    todayDate: todayStr,
+    todayCheckInsCount: todayCheckIns.length,
+    todayCheckIns,
+    todayCheckOutsCount: checkedIn.length,
+    todayCheckOuts: checkedIn,
+    occupancyPercentage,
+    totalOccupied,
+    totalCapacity,
+    availableSuites: Math.max(0, 5 - todaySuites),
+    totalSuites: 5,
+    maintenanceSuites: 0,
+    availableDormBeds: Math.max(0, 15 - todayDormBeds),
+    totalDormBeds: 15,
+    maintenanceDormBeds: 0,
+    pendingBookings,
+    confirmedBookings,
+    totalBookings: bookingList.length,
+    recentBookings: bookingList.slice(0, 10),
+    revenue: {
+      total: totalRevenue,
+      online: onlineBookings.reduce((s, b) => s + (b.amount || 0), 0),
+      counter: counterBookings.reduce((s, b) => s + (b.amount || 0), 0),
+    },
+    // Retain legacy structure
     overview: {
       totalBookings: bookingList.length,
       activeBookings: activeBookings.length,
       totalRevenue,
-      todayArrivals: todayArrivals.length,
+      todayArrivals: todayCheckIns.length,
       checkedInNow: checkedIn.length,
     },
     inventory: {

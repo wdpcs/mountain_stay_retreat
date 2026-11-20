@@ -8,6 +8,7 @@ import GallerySection from './components/GallerySection';
 import ContactSection from './components/ContactSection';
 import Footer from './components/Footer';
 import BookingModal from './components/BookingModal';
+import BookingLookupModal from './components/BookingLookupModal';
 import { getRoomAvailability, submitCounterBooking } from './lib/supabase';
 
 const BASE = import.meta.env.BASE_URL || './';
@@ -77,6 +78,7 @@ export default function StayFacilityWebsite() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState('');
   const [bookingConfirmation, setBookingConfirmation] = useState(null);
+  const [isLookupOpen, setIsLookupOpen] = useState(false);
   const [availability, setAvailability] = useState({
     totalSuites: 5,
     availableSuites: 5,
@@ -339,7 +341,7 @@ export default function StayFacilityWebsite() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-800">
-      <Navbar />
+      <Navbar onOpenLookup={() => setIsLookupOpen(true)} />
 
       <Hero bgImage={getAssetUrl('Images/Rooms/7.jpeg')} />
 
@@ -368,6 +370,7 @@ export default function StayFacilityWebsite() {
         handleCheckAvailability={handleCheckAvailability}
         handleResetStep={handleResetStep}
         handleBookingSubmit={handleBookingSubmit}
+        onOpenLookup={() => setIsLookupOpen(true)}
         availability={availability}
         suitePrice={suitePrice}
         dormPrice={dormPrice}
@@ -406,6 +409,11 @@ export default function StayFacilityWebsite() {
             roomType: 'Suite Room (₹2,500/night)',
           });
         }}
+      />
+
+      <BookingLookupModal
+        isOpen={isLookupOpen}
+        onClose={() => setIsLookupOpen(false)}
       />
     </div>
   );

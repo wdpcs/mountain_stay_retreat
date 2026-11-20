@@ -436,14 +436,41 @@ function isSupabaseConfigured() {
 
 function formatBookingFromDB(b) {
   const checkIn = b.check_in_date || b.checkInDate || b.date || '';
-  const checkOut = b.check_out_date || b.checkOutDate || '';
-  let nights = Number(b.nights) || 1;
-  if (checkIn && checkOut) {
+  let checkOut = b.check_out_date || b.checkOutDate || '';
+  let nights = Number(b.nights) || 0;
+  const notes = b.notes || '';
+
+  if (!checkOut && notes.includes('Stay:')) {
+    const stayMatch = notes.match(/Stay:\s*([0-9-]+)\s*to\s*([0-9-]+)\s*\((\d+)\s*night/i);
+    if (stayMatch) {
+      checkOut = stayMatch[2];
+      nights = Number(stayMatch[3]) || 1;
+    }
+  }
+
+  if (checkIn && checkOut && !nights) {
     const d1 = new Date(checkIn + 'T00:00:00');
     const d2 = new Date(checkOut + 'T00:00:00');
     const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
-    if (diff > 0) nights = diff;
+    nights = diff > 0 ? diff : 1;
   }
+  if (!nights) nights = 1;
+
+  let discountAmount = Number(b.discountAmount || b.discount_amount) || 0;
+  let discountReason = b.discountReason || b.discount_reason || '';
+  if (!discountAmount && notes.includes('Discount ₹')) {
+    const discMatch = notes.match(/Discount\s*₹\s*(\d+)(?:\s*\((.*?)\))?/i);
+    if (discMatch) {
+      discountAmount = Number(discMatch[1]) || 0;
+      discountReason = discMatch[2] || 'Staff privilege discount';
+    }
+  }
+
+  const rawAmount = Number(b.amount) || 0;
+  const originalAmount = b.originalAmount !== undefined
+    ? Number(b.originalAmount)
+    : (discountAmount > 0 ? rawAmount + discountAmount : rawAmount);
+
   return {
     id: b.id,
     name: b.name || b.guest_name || '',
@@ -454,10 +481,13 @@ function formatBookingFromDB(b) {
     checkOutDate: checkOut,
     nights,
     roomType: b.roomType || b.room_type || '',
-    amount: Number(b.amount) || 0,
+    amount: rawAmount,
+    originalAmount,
+    discountAmount,
+    discountReason,
     paymentMethod: b.paymentMethod || b.payment_method || 'Pay at Counter / Property',
     status: b.status || 'Pending at Check-in',
-    notes: b.notes || '',
+    notes,
     paymentId: b.paymentId || b.payment_id || null,
     orderId: b.orderId || b.order_id || null,
     createdAt: b.createdAt || b.created_at || new Date().toISOString(),

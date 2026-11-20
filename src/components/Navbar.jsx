@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function Navbar() {
+export default function Navbar({ onOpenLookup }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
@@ -35,7 +35,7 @@ export default function Navbar() {
         </div>
 
         {/* Desktop Navigation */}
-        <nav className="hidden gap-6 items-center text-sm font-semibold md:flex text-slate-700">
+        <nav className="hidden gap-5 items-center text-sm font-semibold md:flex text-slate-700">
           {navLinks.map((link) => (
             <a
               key={link.name}
@@ -45,6 +45,14 @@ export default function Navbar() {
               {link.name}
             </a>
           ))}
+          <button
+            type="button"
+            onClick={onOpenLookup}
+            className="rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-2xs flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>🔍</span>
+            <span>Find Booking</span>
+          </button>
           <a
             href="#booking"
             className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition"
@@ -78,6 +86,17 @@ export default function Navbar() {
                 {link.name}
               </a>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                setMobileMenuOpen(false);
+                if (onOpenLookup) onOpenLookup();
+              }}
+              className="py-2 text-left font-bold text-blue-700 hover:text-blue-800 transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>🔍</span>
+              <span>Find My Booking Details</span>
+            </button>
             <a
               href="#booking"
               onClick={() => setMobileMenuOpen(false)}

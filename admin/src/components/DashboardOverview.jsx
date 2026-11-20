@@ -321,6 +321,88 @@ export default function DashboardOverview({ stats, onNavigate, onOpenWalkIn, onS
           </div>
         )}
       </div>
+
+      {/* Recent Reservations Placed (All Dates) */}
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xs">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+              <span>📋</span>
+              <span>Recent Reservations Placed (All Dates)</span>
+            </h3>
+            <p className="text-xs text-slate-500 font-medium">
+              Live bookings recorded from the public portal and reception
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate('bookings')}
+            className="text-xs font-bold text-blue-600 hover:text-blue-800"
+          >
+            Manage All Bookings →
+          </button>
+        </div>
+
+        {(!stats.recentBookings || stats.recentBookings.length === 0) ? (
+          <div className="rounded-2xl border border-dashed border-slate-200 p-8 text-center text-slate-500 text-xs font-medium">
+            No bookings recorded yet. New reservations made via the guest portal will appear here automatically.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-slate-200 bg-slate-50/70 text-slate-600 font-bold">
+                <tr>
+                  <th className="py-3 px-3">Booking Ref</th>
+                  <th className="py-3 px-3">Guest Name</th>
+                  <th className="py-3 px-3">Contact</th>
+                  <th className="py-3 px-3">Stay Dates</th>
+                  <th className="py-3 px-3">Accommodation</th>
+                  <th className="py-3 px-3">Amount</th>
+                  <th className="py-3 px-3">Status</th>
+                  <th className="py-3 px-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {stats.recentBookings.map((b) => (
+                  <tr key={b.id} className="hover:bg-slate-50/80 transition">
+                    <td className="py-3 px-3 font-mono font-bold text-blue-700">{b.id}</td>
+                    <td className="py-3 px-3 text-slate-900 font-bold">{b.name}</td>
+                    <td className="py-3 px-3 text-slate-600 text-[11px]">{b.phone || b.email}</td>
+                    <td className="py-3 px-3 text-slate-800">
+                      <div>{b.checkInDate || b.date}</div>
+                      <div className="text-[10px] text-slate-500 font-medium">
+                        {b.checkOutDate ? `to ${b.checkOutDate} (${b.nights || 1}n)` : `${b.nights || 1} night`}
+                      </div>
+                    </td>
+                    <td className="py-3 px-3 text-slate-700">{b.roomType}</td>
+                    <td className="py-3 px-3 font-extrabold text-slate-900">₹{(b.amount || 0).toLocaleString('en-IN')}</td>
+                    <td className="py-3 px-3">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        b.status === 'Checked In'
+                          ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                          : b.status === 'Paid Online'
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : b.status === 'Checked Out'
+                          ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                          : 'bg-amber-50 text-amber-800 border border-amber-200'
+                      }`}>
+                        {b.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      <button
+                        onClick={() => onNavigate('bookings')}
+                        className="rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700 hover:bg-blue-600 hover:text-white transition border border-blue-200"
+                      >
+                        Manage
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
