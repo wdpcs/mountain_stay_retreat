@@ -333,7 +333,11 @@ export async function lookupBooking(searchQuery) {
         `guest_email.ilike.*${encodeURIComponent(q)}*`,
         `guest_name.ilike.*${encodeURIComponent(q)}*`,
       ];
-      if (cleanPhone.length >= 5) {
+      if (cleanPhone.length >= 10) {
+        const last10 = cleanPhone.slice(-10);
+        filterConditions.push(`guest_phone.ilike.*${encodeURIComponent(last10)}*`);
+        filterConditions.push(`guest_phone.ilike.*${encodeURIComponent(last10.slice(0, 5))}*${encodeURIComponent(last10.slice(5))}*`);
+      } else if (cleanPhone.length >= 5) {
         filterConditions.push(`guest_phone.ilike.*${encodeURIComponent(cleanPhone)}*`);
       }
       const url = `${SUPABASE_URL}/rest/v1/bookings?or=(${filterConditions.join(',')})&order=created_at.desc&limit=10`;
