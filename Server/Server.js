@@ -1108,6 +1108,7 @@ app.get('/api/admin/dashboard/stats', requireAuth(), async (req, res) => {
     pendingBookings,
     confirmedBookings,
     totalBookings: bookings.length,
+    recentBookings: bookings.slice(0, 10),
     revenue: {
       total: totalRevenue,
       online: onlineRevenue,
