@@ -198,6 +198,8 @@ begin
       guest_email as "email",
       guest_phone as "phone",
       check_in_date as "date",
+      check_in_date as "checkInDate",
+      check_out_date as "checkOutDate",
       room_type as "roomType",
       amount,
       payment_method as "paymentMethod",

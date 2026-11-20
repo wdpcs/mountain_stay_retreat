@@ -567,7 +567,11 @@ async function syncBookingToSupabase(record) {
       created_at: record.createdAt || new Date().toISOString(),
     };
 
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
+    const payloadWithCheckout = record.checkOutDate
+      ? { ...payload, check_out_date: record.checkOutDate }
+      : payload;
+
+    let res = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -575,10 +579,26 @@ async function syncBookingToSupabase(record) {
         Authorization: `Bearer ${SUPABASE_KEY}`,
         Prefer: 'return=minimal',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payloadWithCheckout),
     });
 
-    if (!res.ok) {
+    if (!res.ok && res.status === 400) {
+      const errText = await res.text();
+      if (errText.includes('check_out_date')) {
+        res = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: SUPABASE_KEY,
+            Authorization: `Bearer ${SUPABASE_KEY}`,
+            Prefer: 'return=minimal',
+          },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        console.warn('Sync booking to Supabase returned error:', res.status, errText);
+      }
+    } else if (!res.ok) {
       const errText = await res.text();
       console.warn('Sync booking to Supabase returned error:', res.status, errText);
     }

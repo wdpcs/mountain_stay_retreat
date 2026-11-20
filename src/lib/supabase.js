@@ -141,23 +141,27 @@ export async function submitCounterBooking(bookingData) {
     : '';
   const combinedNotes = [bookingData.notes, stayNote].filter(Boolean).join(' | ');
 
-  const record = {
+  const baseRecord = {
     id: bookingId,
     guest_name: bookingData.name,
     guest_email: bookingData.email,
     guest_phone: bookingData.phone,
     check_in_date: checkInDate,
     room_type: bookingData.roomType,
-    amount: bookingData.amount,
+    amount: Number(bookingData.amount) || 0,
     payment_method: 'Pay at Counter / Property',
     status: 'Pending at Check-in',
     notes: combinedNotes,
     created_at: new Date().toISOString(),
   };
 
+  const payloadWithCheckout = checkOutDate
+    ? { ...baseRecord, check_out_date: checkOutDate }
+    : baseRecord;
+
   // Always mirror to localStorage as offline safety net
   saveLocalBooking({
-    id: bookingId,
+    ...baseRecord,
     name: bookingData.name,
     email: bookingData.email,
     phone: bookingData.phone,
@@ -166,16 +170,15 @@ export async function submitCounterBooking(bookingData) {
     checkOutDate,
     nights,
     roomType: bookingData.roomType,
-    amount: bookingData.amount,
     paymentMethod: 'Pay at Counter / Property',
     status: 'Pending at Check-in',
     notes: combinedNotes,
-    createdAt: record.created_at,
+    createdAt: baseRecord.created_at,
   });
 
   if (isSupabaseConfigured()) {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
+      let res = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -183,8 +186,28 @@ export async function submitCounterBooking(bookingData) {
           Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
           Prefer: 'return=minimal',
         },
-        body: JSON.stringify(record),
+        body: JSON.stringify(payloadWithCheckout),
       });
+
+      // If schema does not yet have check_out_date column, retry with base record
+      if (!res.ok && res.status === 400) {
+        const errorText = await res.text();
+        if (errorText.includes('check_out_date')) {
+          console.warn('Supabase check_out_date column not in cache; inserting with dates in notes.');
+          res = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+              Prefer: 'return=minimal',
+            },
+            body: JSON.stringify(baseRecord),
+          });
+        } else {
+          console.error('Supabase booking sync error response:', res.status, errorText);
+        }
+      }
 
       if (res.ok) {
         return { success: true, bookingId, syncedToCloud: true };

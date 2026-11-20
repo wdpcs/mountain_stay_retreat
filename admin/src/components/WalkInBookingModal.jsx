@@ -138,7 +138,24 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
       const cleanPhone = phone.trim() || '+91 70250 17611';
       const cleanEmail = email.trim() || `${phone.replace(/\D/g, '') || 'walkin'}@wdpcs.in`;
 
-      const sbRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
+      const baseWalkInPayload = {
+        id: bookingId,
+        guest_name: name.trim(),
+        guest_email: cleanEmail,
+        guest_phone: cleanPhone,
+        check_in_date: date,
+        room_type: roomType,
+        amount: currentPrice,
+        payment_method: 'Pay at Counter / Property',
+        status: status || 'Paid at Counter',
+        notes: combinedNotes,
+      };
+
+      const payloadWithCheckout = checkOutDate
+        ? { ...baseWalkInPayload, check_out_date: checkOutDate }
+        : baseWalkInPayload;
+
+      let sbRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -146,19 +163,24 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
           Authorization: `Bearer ${SUPABASE_KEY}`,
           Prefer: 'return=minimal',
         },
-        body: JSON.stringify({
-          id: bookingId,
-          guest_name: name.trim(),
-          guest_email: cleanEmail,
-          guest_phone: cleanPhone,
-          check_in_date: date,
-          room_type: roomType,
-          amount: currentPrice,
-          payment_method: 'Pay at Counter / Property',
-          status: status || 'Paid at Counter',
-          notes: combinedNotes,
-        }),
+        body: JSON.stringify(payloadWithCheckout),
       });
+
+      if (!sbRes.ok && sbRes.status === 400) {
+        const errText = await sbRes.text();
+        if (errText.includes('check_out_date')) {
+          sbRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              apikey: SUPABASE_KEY,
+              Authorization: `Bearer ${SUPABASE_KEY}`,
+              Prefer: 'return=minimal',
+            },
+            body: JSON.stringify(baseWalkInPayload),
+          });
+        }
+      }
 
       if (sbRes.ok) {
         onBookingCreated();
