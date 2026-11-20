@@ -24,6 +24,8 @@ admin/.env.*
 !admin/.env.example
 
 # Design source files
+*.psd
+design/**/*.psd
 public/**/*.psd
 
 # Editor directories and files

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -14,12 +15,25 @@ export default function BookingWizard({
   availability,
   suitePrice,
   dormPrice,
-  roomAmounts,
+  nights = 1,
+  ratePerNight = 2500,
+  totalAmount = 2500,
   isSoldOut,
   selectedAvailableCount,
   bookingError,
   isSubmitting,
 }) {
+  const minCheckInDate = useMemo(() => new Date(), []);
+  const minCheckOutDate = useMemo(() => {
+    if (formData.checkInDate) {
+      const d = new Date(formData.checkInDate + 'T00:00:00');
+      d.setDate(d.getDate() + 1);
+      return d;
+    }
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d;
+  }, [formData.checkInDate]);
   return (
     <section id="booking" className="bg-slate-900 px-6 py-20 text-white">
       <div className="mx-auto mb-12 max-w-5xl text-center">
@@ -40,7 +54,7 @@ export default function BookingWizard({
 
         <p className="text-sm sm:text-base md:text-lg text-slate-300 max-w-2xl mx-auto">
           {bookingStep === 1
-            ? 'Select your arrival date and preferred accommodation to verify live room availability.'
+            ? 'Select your arrival & departure dates and accommodation to verify live availability.'
             : 'Fill in your contact information to reserve your room immediately with Pay-at-Counter.'}
         </p>
       </div>
@@ -57,47 +71,103 @@ export default function BookingWizard({
             <div>
               <div className="mb-6 flex items-center justify-between">
                 <h4 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-                  <span>📅</span> Select Date & Room
+                  <span>📅</span> Select Stay Dates & Room
                 </h4>
                 <span className="rounded-full bg-blue-500/20 px-3 py-1 text-xs font-bold text-blue-300">
                   Step 1
                 </span>
               </div>
 
-              <form onSubmit={handleCheckAvailability} className="space-y-5">
-                <div>
-                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-300">
-                    Check-in Date *
-                  </label>
-                  <div className="relative w-full">
-                    <DatePicker
-                      selected={formData.checkInDate ? new Date(formData.checkInDate) : null}
-                      onChange={(date) => {
-                        if (!date) {
-                          return handleInputChange({ target: { name: 'checkInDate', value: '' } });
-                        }
-                        const localISOTime = new Date(
-                          date.getTime() - date.getTimezoneOffset() * 60000
-                        )
-                          .toISOString()
-                          .split('T')[0];
-                        handleInputChange({ target: { name: 'checkInDate', value: localISOTime } });
-                      }}
-                      dateFormat="dd-MM-yyyy"
-                      placeholderText="Select date (DD-MM-YYYY)"
-                      minDate={new Date()}
-                      required
-                      className="w-full rounded-2xl border border-white/10 bg-slate-900/90 px-5 py-4 text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                      wrapperClassName="w-full"
-                      popperPlacement="bottom-end"
-                    />
-                    <div className="pointer-events-none absolute inset-y-0 right-5 flex items-center">
-                      <svg className="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
+              <form onSubmit={handleCheckAvailability} className="space-y-4">
+                {/* Stay Dates (Check-in & Check-out) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-300">
+                      Check-in Date *
+                    </label>
+                    <div className="relative w-full">
+                      <DatePicker
+                        selected={formData.checkInDate ? new Date(formData.checkInDate + 'T00:00:00') : null}
+                        onChange={(date) => {
+                          if (!date) {
+                            return handleInputChange({ target: { name: 'checkInDate', value: '' } });
+                          }
+                          const localISOTime = new Date(
+                            date.getTime() - date.getTimezoneOffset() * 60000
+                          )
+                            .toISOString()
+                            .split('T')[0];
+                          handleInputChange({ target: { name: 'checkInDate', value: localISOTime } });
+                        }}
+                        dateFormat="dd-MM-yyyy"
+                        placeholderText="Check-in (DD-MM-YYYY)"
+                        minDate={minCheckInDate}
+                        required
+                        className="w-full rounded-2xl border border-white/10 bg-slate-900/90 px-4 py-3.5 text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-xs sm:text-sm"
+                        wrapperClassName="w-full"
+                        popperPlacement="bottom-start"
+                      />
+                      <div className="pointer-events-none absolute inset-y-0 right-3.5 flex items-center">
+                        <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-300">
+                      Check-out Date *
+                    </label>
+                    <div className="relative w-full">
+                      <DatePicker
+                        selected={formData.checkOutDate ? new Date(formData.checkOutDate + 'T00:00:00') : null}
+                        onChange={(date) => {
+                          if (!date) {
+                            return handleInputChange({ target: { name: 'checkOutDate', value: '' } });
+                          }
+                          const localISOTime = new Date(
+                            date.getTime() - date.getTimezoneOffset() * 60000
+                          )
+                            .toISOString()
+                            .split('T')[0];
+                          handleInputChange({ target: { name: 'checkOutDate', value: localISOTime } });
+                        }}
+                        dateFormat="dd-MM-yyyy"
+                        placeholderText="Check-out (DD-MM-YYYY)"
+                        minDate={minCheckOutDate}
+                        required
+                        className="w-full rounded-2xl border border-white/10 bg-slate-900/90 px-4 py-3.5 text-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-xs sm:text-sm"
+                        wrapperClassName="w-full"
+                        popperPlacement="bottom-start"
+                      />
+                      <div className="pointer-events-none absolute inset-y-0 right-3.5 flex items-center">
+                        <svg className="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
                     </div>
                   </div>
                 </div>
+
+                {/* Duration of Stay Callout */}
+                {formData.checkInDate && formData.checkOutDate && (
+                  <div className="flex items-center justify-between rounded-2xl bg-slate-950/80 border border-slate-700/80 px-4 py-3 text-xs">
+                    <div className="flex items-center gap-2 text-slate-300">
+                      <span className="text-base">🌙</span>
+                      <span>Stay Duration:</span>
+                      <span className="font-bold text-white bg-blue-600/40 border border-blue-500/40 px-2.5 py-0.5 rounded-full">
+                        {nights} {nights === 1 ? 'Night' : 'Nights'}
+                      </span>
+                    </div>
+                    <div className="text-right text-slate-300">
+                      <span className="text-slate-400">Total: </span>
+                      <span className="font-extrabold text-emerald-400 text-sm">
+                        ₹{totalAmount.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-300">
@@ -181,7 +251,7 @@ export default function BookingWizard({
                     <span>✅ Accommodation Available!</span>
                   </h4>
                   <p className="text-xs text-slate-300 mt-1">
-                    {formData.roomType} on {formData.checkInDate} ({selectedAvailableCount} remaining)
+                    {formData.roomType.split('(')[0].trim()} • {formData.checkInDate} to {formData.checkOutDate} ({nights} {nights === 1 ? 'night' : 'nights'}) • {selectedAvailableCount} units remaining
                   </p>
                 </div>
                 <button
@@ -268,7 +338,19 @@ export default function BookingWizard({
                 </div>
 
                 {/* Summary Box */}
-                <div className="rounded-2xl border border-slate-700/80 bg-slate-950/80 p-4">
+                <div className="rounded-2xl border border-slate-700/80 bg-slate-950/80 p-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-slate-300">
+                    <span>Stay Duration:</span>
+                    <span className="font-semibold text-white">
+                      {nights} {nights === 1 ? 'Night' : 'Nights'} ({formData.checkInDate} to {formData.checkOutDate})
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-300">
+                    <span>Rate Calculation:</span>
+                    <span className="font-semibold text-slate-200">
+                      ₹{ratePerNight.toLocaleString('en-IN')} × {nights} {nights === 1 ? 'night' : 'nights'}
+                    </span>
+                  </div>
                   <div className="flex items-center justify-between text-xs text-slate-300">
                     <span>Selected Payment Option:</span>
                     <span className="font-bold text-emerald-400">
@@ -278,7 +360,7 @@ export default function BookingWizard({
                   <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 text-sm font-semibold">
                     <span>Total Amount Due:</span>
                     <span className="text-xl font-extrabold text-emerald-400">
-                      ₹{(roomAmounts[formData.roomType] || 2500).toLocaleString('en-IN')}
+                      ₹{totalAmount.toLocaleString('en-IN')}
                     </span>
                   </div>
                 </div>

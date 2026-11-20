@@ -123,6 +123,7 @@ create table if not exists public.bookings (
   guest_email text not null,
   guest_phone text not null,
   check_in_date date not null,
+  check_out_date date,
   room_type text not null,
   amount integer not null check (amount >= 0),
   payment_method text not null check (payment_method in (

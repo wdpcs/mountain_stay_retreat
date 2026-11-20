@@ -23,9 +23,17 @@ export default function AvailabilityCalendar({ token, bookings = [] }) {
       d.setDate(today.getDate() + i);
       const dateStr = d.toISOString().split('T')[0];
 
-      const dayBookings = (bookings || []).filter(
-        (b) => b.date === dateStr && b.status !== 'Cancelled'
-      );
+      const isBookingActiveOnDate = (b, dStr) => {
+        if (b.status === 'Cancelled' || b.status === 'Refunded') return false;
+        const inDate = b.checkInDate || b.date;
+        const outDate = b.checkOutDate;
+        if (inDate && outDate) {
+          return dStr >= inDate && dStr < outDate;
+        }
+        return inDate === dStr;
+      };
+
+      const dayBookings = (bookings || []).filter((b) => isBookingActiveOnDate(b, dateStr));
       const suitesBooked = dayBookings.filter((b) => (b.roomType || '').includes('Suite')).length;
       const dormBooked = dayBookings.filter((b) => (b.roomType || '').includes('Dormitory')).length;
 

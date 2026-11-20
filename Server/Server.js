@@ -277,6 +277,107 @@ let roomPrices = {
   dormPrice: 450,
 };
 
+const FLEXI_RATES_FILE = path.join(__dirname, 'flexi_rates.json');
+
+const DEFAULT_FLEXI_PRICING = {
+  weekendPricing: {
+    enabled: false,
+    days: [5, 6, 0], // Friday (5), Saturday (6), Sunday (0)
+    suitePrice: 2800,
+    dormPrice: 500,
+  },
+  seasonalRules: [
+    {
+      id: 'SEASON-1',
+      name: 'Peak Holiday Season (Dec - Jan)',
+      startDate: '2026-12-20',
+      endDate: '2027-01-05',
+      suitePrice: 3200,
+      dormPrice: 550,
+      enabled: true,
+    },
+    {
+      id: 'SEASON-2',
+      name: 'Monsoon Special Offer',
+      startDate: '2026-06-01',
+      endDate: '2026-08-31',
+      suitePrice: 2000,
+      dormPrice: 380,
+      enabled: false,
+    },
+  ],
+};
+
+function saveFlexiPricing(data) {
+  try {
+    fs.writeFileSync(FLEXI_RATES_FILE, JSON.stringify(data, null, 2), 'utf8');
+  } catch (err) {
+    console.error('[PRICING] Failed to save flexi_rates.json:', err.message);
+  }
+}
+
+function loadFlexiPricing() {
+  try {
+    if (fs.existsSync(FLEXI_RATES_FILE)) {
+      const raw = fs.readFileSync(FLEXI_RATES_FILE, 'utf8');
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.error('[PRICING] Failed to load flexi_rates.json:', err.message);
+  }
+  return { ...DEFAULT_FLEXI_PRICING };
+}
+
+let flexiPricing = loadFlexiPricing();
+
+function getDailyRate(dateStr, isDorm = false) {
+  if (!dateStr) {
+    return isDorm ? roomPrices.dormPrice : roomPrices.suitePrice;
+  }
+  // 1. Check active seasonal rules
+  const activeSeason = (flexiPricing.seasonalRules || []).find((rule) => {
+    return rule.enabled && dateStr >= rule.startDate && dateStr <= rule.endDate;
+  });
+  if (activeSeason) {
+    return isDorm ? Number(activeSeason.dormPrice) : Number(activeSeason.suitePrice);
+  }
+
+  // 2. Check weekend pricing
+  if (flexiPricing.weekendPricing?.enabled) {
+    const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
+    const weekendDays = flexiPricing.weekendPricing.days || [5, 6, 0];
+    if (weekendDays.includes(dayOfWeek)) {
+      return isDorm ? Number(flexiPricing.weekendPricing.dormPrice) : Number(flexiPricing.weekendPricing.suitePrice);
+    }
+  }
+
+  // 3. Fallback to standard base rate
+  return isDorm ? roomPrices.dormPrice : roomPrices.suitePrice;
+}
+
+function calculateStayAmount(checkInDate, checkOutDate, roomType) {
+  const isDorm = (roomType || '').toLowerCase().includes('dormitory');
+  if (!checkInDate) {
+    return isDorm ? roomPrices.dormPrice : roomPrices.suitePrice;
+  }
+  const inDate = new Date(checkInDate + 'T00:00:00');
+  const outDate = checkOutDate
+    ? new Date(checkOutDate + 'T00:00:00')
+    : new Date(inDate.getTime() + 86400000);
+  let total = 0;
+  const current = new Date(inDate);
+
+  while (current < outDate) {
+    const dStr = current.toISOString().split('T')[0];
+    total += getDailyRate(dStr, isDorm);
+    current.setDate(current.getDate() + 1);
+  }
+  return total > 0 ? total : (isDorm ? roomPrices.dormPrice : roomPrices.suitePrice);
+}
+
 let maintenanceStatus = {
   maintenanceSuites: 0,
   maintenanceDormBeds: 0,
@@ -334,12 +435,24 @@ function isSupabaseConfigured() {
 }
 
 function formatBookingFromDB(b) {
+  const checkIn = b.check_in_date || b.checkInDate || b.date || '';
+  const checkOut = b.check_out_date || b.checkOutDate || '';
+  let nights = Number(b.nights) || 1;
+  if (checkIn && checkOut) {
+    const d1 = new Date(checkIn + 'T00:00:00');
+    const d2 = new Date(checkOut + 'T00:00:00');
+    const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+    if (diff > 0) nights = diff;
+  }
   return {
     id: b.id,
     name: b.name || b.guest_name || '',
     email: b.email || b.guest_email || '',
     phone: b.phone || b.guest_phone || '',
-    date: b.date || b.check_in_date || '',
+    date: checkIn,
+    checkInDate: checkIn,
+    checkOutDate: checkOut,
+    nights,
     roomType: b.roomType || b.room_type || '',
     amount: Number(b.amount) || 0,
     paymentMethod: b.paymentMethod || b.payment_method || 'Pay at Counter / Property',
@@ -444,13 +557,14 @@ async function syncBookingToSupabase(record) {
   }
 }
 
-async function syncBookingStatusToSupabase(bookingId, newStatus, notes) {
+async function syncBookingStatusToSupabase(bookingId, newStatus, notes, updatedAmount) {
   if (!isSupabaseConfigured()) return;
   try {
     let dbStatus = newStatus;
     if (dbStatus === 'Paid at Counter') dbStatus = 'Checked In';
     const updateBody = { status: dbStatus };
     if (notes !== undefined) updateBody.notes = notes;
+    if (updatedAmount !== undefined) updateBody.amount = Number(updatedAmount);
     await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${bookingId}`, {
       method: 'PATCH',
       headers: {
@@ -503,7 +617,7 @@ function logAuditEvent(adminUser, action, targetType, targetId, details, req) {
 }
 
 // Validation helper
-function validateBookingData({ name, email, phone, date, roomType }) {
+function validateBookingData({ name, email, phone, date, checkInDate, checkOutDate, roomType }) {
   const errors = [];
   if (!name || typeof name !== 'string' || name.trim().length < 2) {
     errors.push('Guest name is required (minimum 2 characters).');
@@ -516,8 +630,12 @@ function validateBookingData({ name, email, phone, date, roomType }) {
   if (!phone || typeof phone !== 'string' || phoneDigits.length < 7) {
     errors.push('A valid contact phone number with at least 7 digits is required.');
   }
-  if (!date || typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  const effectiveInDate = checkInDate || date;
+  if (!effectiveInDate || typeof effectiveInDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(effectiveInDate)) {
     errors.push('A valid check-in date in YYYY-MM-DD format is required.');
+  }
+  if (checkOutDate && (typeof checkOutDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(checkOutDate) || checkOutDate <= effectiveInDate)) {
+    errors.push('Check-out date must be after check-in date.');
   }
   if (!roomType || typeof roomType !== 'string') {
     errors.push('Room type selection is required.');
@@ -526,9 +644,17 @@ function validateBookingData({ name, email, phone, date, roomType }) {
 }
 
 function checkRoomAvailability(date, roomType) {
-  const activeBookings = bookings.filter(
-    (b) => b.status !== 'Cancelled' && b.date === date
-  );
+  const isBookingActiveOnDate = (b, dStr) => {
+    if (b.status === 'Cancelled' || b.status === 'Refunded') return false;
+    const inDate = b.checkInDate || b.date;
+    const outDate = b.checkOutDate;
+    if (inDate && outDate) {
+      return dStr >= inDate && dStr < outDate;
+    }
+    return inDate === dStr;
+  };
+
+  const activeBookings = bookings.filter((b) => isBookingActiveOnDate(b, date));
   const isDorm = (roomType || '').toLowerCase().includes('dormitory');
   const isSuite = (roomType || '').toLowerCase().includes('suite');
 
@@ -562,8 +688,19 @@ function checkRoomAvailability(date, roomType) {
 app.get('/api/availability', async (req, res) => {
   await syncWithSupabase();
   const { date } = req.query;
+
+  const isBookingActiveOnDate = (b, dStr) => {
+    if (b.status === 'Cancelled' || b.status === 'Refunded') return false;
+    const inDate = b.checkInDate || b.date;
+    const outDate = b.checkOutDate;
+    if (inDate && outDate) {
+      return dStr >= inDate && dStr < outDate;
+    }
+    return inDate === dStr;
+  };
+
   const activeBookings = bookings.filter(
-    (b) => b.status !== 'Cancelled' && (!date || b.date === date)
+    (b) => b.status !== 'Cancelled' && (!date || isBookingActiveOnDate(b, date))
   );
 
   const bookedSuites = activeBookings.filter((b) => b.roomType.includes('Suite')).length;
@@ -571,6 +708,9 @@ app.get('/api/availability', async (req, res) => {
 
   const availableSuites = Math.max(0, TOTAL_SUITES - bookedSuites - maintenanceStatus.maintenanceSuites);
   const availableDormBeds = Math.max(0, TOTAL_DORM_BEDS - bookedDormBeds - maintenanceStatus.maintenanceDormBeds);
+
+  const effectiveSuitePrice = date ? getDailyRate(date, false) : roomPrices.suitePrice;
+  const effectiveDormPrice = date ? getDailyRate(date, true) : roomPrices.dormPrice;
 
   res.json({
     date: date || null,
@@ -580,39 +720,101 @@ app.get('/api/availability', async (req, res) => {
     totalDormBeds: TOTAL_DORM_BEDS,
     availableDormBeds,
     maintenanceDormBeds: maintenanceStatus.maintenanceDormBeds,
-    roomPrices,
+    roomPrices: {
+      suitePrice: effectiveSuitePrice,
+      dormPrice: effectiveDormPrice,
+    },
+    basePrices: roomPrices,
+    flexiPricing,
   });
 });
 
 // Public prices endpoint
 app.get('/api/prices', (req, res) => {
-  res.json(roomPrices);
+  const { date } = req.query;
+  if (date) {
+    return res.json({
+      suitePrice: getDailyRate(date, false),
+      dormPrice: getDailyRate(date, true),
+      basePrices: roomPrices,
+      flexiPricing,
+    });
+  }
+  res.json({ ...roomPrices, basePrices: roomPrices, flexiPricing });
+});
+
+// Public flexi rates inspection
+app.get('/api/flexi-rates', (req, res) => {
+  res.json({ success: true, basePrices: roomPrices, flexiPricing });
+});
+
+// Admin Flexi Rates endpoints
+app.get('/api/admin/flexi-rates', requireAuth(), (req, res) => {
+  res.json({ success: true, basePrices: roomPrices, flexiPricing });
+});
+
+app.post('/api/admin/flexi-rates', requireAuth(['admin', 'manager']), (req, res) => {
+  const { weekendPricing, seasonalRules } = req.body;
+  if (weekendPricing) {
+    flexiPricing.weekendPricing = {
+      ...flexiPricing.weekendPricing,
+      ...weekendPricing,
+      suitePrice: Number(weekendPricing.suitePrice) || flexiPricing.weekendPricing.suitePrice,
+      dormPrice: Number(weekendPricing.dormPrice) || flexiPricing.weekendPricing.dormPrice,
+    };
+  }
+  if (Array.isArray(seasonalRules)) {
+    flexiPricing.seasonalRules = seasonalRules;
+  }
+  saveFlexiPricing(flexiPricing);
+  logAuditEvent(req.adminUser, 'UPDATE_FLEXI_RATES', 'Pricing', 'FLEXI', flexiPricing, req);
+  res.json({ success: true, message: 'Flexi rate system updated successfully.', flexiPricing });
 });
 
 // Public Counter booking reservation
 app.post('/book-counter', async (req, res) => {
   try {
-    const { name, email, phone, date, roomType } = req.body;
+    const { name, email, phone, date, checkInDate, checkOutDate, nights: reqNights, roomType, amount: customAmount } = req.body;
+    const actualCheckIn = checkInDate || date;
+    const actualCheckOut = checkOutDate || '';
 
-    const validationErrors = validateBookingData({ name, email, phone, date, roomType });
+    const validationErrors = validateBookingData({
+      name,
+      email,
+      phone,
+      date: actualCheckIn,
+      checkOutDate: actualCheckOut,
+      roomType,
+    });
     if (validationErrors.length > 0) {
       return res.status(400).json({ success: false, error: validationErrors[0], errors: validationErrors });
     }
 
-    const availCheck = checkRoomAvailability(date, roomType);
+    const availCheck = checkRoomAvailability(actualCheckIn, roomType);
     if (!availCheck.available) {
       return res.status(400).json({ success: false, error: availCheck.error });
     }
 
+    let nights = Number(reqNights) || 1;
+    if (actualCheckIn && actualCheckOut) {
+      const d1 = new Date(actualCheckIn + 'T00:00:00');
+      const d2 = new Date(actualCheckOut + 'T00:00:00');
+      const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+      nights = diff > 0 ? diff : 1;
+    }
+
     const bookingId = 'MSR-CTR-' + Math.floor(100000 + Math.random() * 900000);
-    const amount = roomType && roomType.includes('Dormitory') ? roomPrices.dormPrice : roomPrices.suitePrice;
+    const amount = customAmount ? Number(customAmount) : calculateStayAmount(actualCheckIn, actualCheckOut, roomType);
 
     const newBooking = {
       id: bookingId,
       name: name.trim(),
       email: email.trim().toLowerCase(),
       phone: phone ? phone.trim() : '',
-      date,
+      date: actualCheckIn,
+      checkInDate: actualCheckIn,
+      checkOutDate: actualCheckOut,
+      nights,
       roomType: roomType || 'Suite Room (₹2,500/night)',
       amount,
       paymentMethod: 'Pay at Counter / Property',
@@ -629,13 +831,15 @@ app.post('/book-counter', async (req, res) => {
       type: 'new_booking',
       bookingId: newBooking.id,
       title: `New Reservation: ${newBooking.name}`,
-      message: `${newBooking.name} reserved ${newBooking.roomType} for ${newBooking.date} (₹${newBooking.amount.toLocaleString('en-IN')})`,
+      message: `${newBooking.name} reserved ${newBooking.roomType} for ${newBooking.nights} night(s) from ${newBooking.date} to ${newBooking.checkOutDate || 'next day'} (₹${newBooking.amount.toLocaleString('en-IN')})`,
       amount: newBooking.amount,
       roomType: newBooking.roomType,
       guestName: newBooking.name,
       guestPhone: newBooking.phone,
       guestEmail: newBooking.email,
       checkInDate: newBooking.date,
+      checkOutDate: newBooking.checkOutDate,
+      nights: newBooking.nights,
       paymentMethod: newBooking.paymentMethod,
       read: false,
       createdAt: new Date().toISOString(),
@@ -917,22 +1121,42 @@ app.get('/api/admin/bookings', requireAuth(), async (req, res) => {
 
 // Manual Front Desk Walk-In Booking
 app.post('/api/admin/bookings/walkin', requireAuth(['admin', 'manager', 'receptionist']), async (req, res) => {
-  const { name, email, phone, date, roomType, amount, paymentMethod, status, notes } = req.body;
+  const { name, email, phone, date, checkInDate, checkOutDate, nights: reqNights, roomType, amount, paymentMethod, status, notes } = req.body;
+  const actualCheckIn = checkInDate || date;
+  const actualCheckOut = checkOutDate || '';
 
-  const validationErrors = validateBookingData({ name, email, phone, date, roomType });
+  const validationErrors = validateBookingData({
+    name,
+    email,
+    phone,
+    date: actualCheckIn,
+    checkOutDate: actualCheckOut,
+    roomType,
+  });
   if (validationErrors.length > 0) {
     return res.status(400).json({ success: false, error: validationErrors[0] });
   }
 
+  let nights = Number(reqNights) || 1;
+  if (actualCheckIn && actualCheckOut) {
+    const d1 = new Date(actualCheckIn + 'T00:00:00');
+    const d2 = new Date(actualCheckOut + 'T00:00:00');
+    const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+    nights = diff > 0 ? diff : 1;
+  }
+
   const bookingId = 'MSR-CTR-' + Math.floor(100000 + Math.random() * 900000);
-  const calculatedAmount = Number(amount) || (roomType.includes('Dormitory') ? roomPrices.dormPrice : roomPrices.suitePrice);
+  const calculatedAmount = Number(amount) || calculateStayAmount(actualCheckIn, actualCheckOut, roomType);
 
   const newBooking = {
     id: bookingId,
     name: name.trim(),
     email: email.trim().toLowerCase(),
     phone: phone ? phone.trim() : '',
-    date,
+    date: actualCheckIn,
+    checkInDate: actualCheckIn,
+    checkOutDate: actualCheckOut,
+    nights,
     roomType,
     amount: calculatedAmount,
     paymentMethod: paymentMethod || 'Cash at Counter',
@@ -960,15 +1184,15 @@ app.post('/api/admin/bookings/walkin', requireAuth(['admin', 'manager', 'recepti
     });
   }
 
-  logAuditEvent(req.adminUser, 'CREATE_WALKIN_BOOKING', 'Booking', bookingId, `Created walk-in booking for ${newBooking.name} (₹${calculatedAmount})`, req);
+  logAuditEvent(req.adminUser, 'CREATE_WALKIN_BOOKING', 'Booking', bookingId, `Created walk-in booking for ${newBooking.name} for ${nights} night(s) (₹${calculatedAmount})`, req);
 
   res.status(201).json({ success: true, booking: newBooking });
 });
 
-// Update Booking Status
+// Update Booking Status & Settle Checkout with Discount
 app.patch('/api/admin/bookings/:id', requireAuth(), async (req, res) => {
   const { id } = req.params;
-  const { status, notes } = req.body;
+  const { status, notes, discountAmount, discountReason, finalAmount, paymentMethod } = req.body;
   const booking = bookings.find((b) => b.id === id);
 
   if (!booking) {
@@ -977,11 +1201,28 @@ app.patch('/api/admin/bookings/:id', requireAuth(), async (req, res) => {
 
   const oldStatus = booking.status;
   if (status) booking.status = status;
+  if (paymentMethod) booking.paymentMethod = paymentMethod;
+
+  if (discountAmount !== undefined && Number(discountAmount) >= 0) {
+    booking.originalAmount = booking.originalAmount || booking.amount;
+    booking.discountAmount = Number(discountAmount);
+    booking.discountReason = discountReason || 'Staff Checkout Privilege';
+    if (finalAmount !== undefined) {
+      booking.amount = Number(finalAmount);
+    } else {
+      booking.amount = Math.max(0, booking.originalAmount - booking.discountAmount);
+    }
+  }
+
   if (notes !== undefined) booking.notes = notes;
 
-  await syncBookingStatusToSupabase(id, status, notes);
+  await syncBookingStatusToSupabase(id, booking.status, booking.notes, booking.amount);
 
-  logAuditEvent(req.adminUser, 'UPDATE_BOOKING_STATUS', 'Booking', id, `Changed status from '${oldStatus}' to '${status}'.`, req);
+  let auditDesc = `Changed status from '${oldStatus}' to '${booking.status}'.`;
+  if (booking.discountAmount > 0) {
+    auditDesc += ` Applied checkout discount ₹${booking.discountAmount.toLocaleString('en-IN')} (${booking.discountReason}). Final settled amount: ₹${booking.amount.toLocaleString('en-IN')}.`;
+  }
+  logAuditEvent(req.adminUser, 'UPDATE_BOOKING_STATUS', 'Booking', id, auditDesc, req);
 
   res.json({ success: true, booking });
 });

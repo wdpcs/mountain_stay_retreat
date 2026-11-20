@@ -100,11 +100,21 @@ export async function getRoomAvailability(dateStr = '') {
 
   // Offline / Default calculation from local storage
   const localBookings = getLocalBookings();
+  const isBookingActiveOnDate = (b, dStr) => {
+    if (b.status === 'Cancelled' || b.status === 'Refunded') return false;
+    const inDate = b.checkInDate || b.date;
+    const outDate = b.checkOutDate;
+    if (inDate && outDate) {
+      return dStr >= inDate && dStr < outDate;
+    }
+    return inDate === dStr;
+  };
+
   const bookedSuites = localBookings.filter(
-    (b) => b.date === dateStr && b.roomType.includes('Suite') && b.status !== 'Cancelled'
+    (b) => isBookingActiveOnDate(b, dateStr) && b.roomType.includes('Suite')
   ).length;
   const bookedDorms = localBookings.filter(
-    (b) => b.date === dateStr && b.roomType.includes('Dormitory') && b.status !== 'Cancelled'
+    (b) => isBookingActiveOnDate(b, dateStr) && b.roomType.includes('Dormitory')
   ).length;
 
   return {
@@ -121,17 +131,25 @@ export async function getRoomAvailability(dateStr = '') {
  */
 export async function submitCounterBooking(bookingData) {
   const bookingId = `MSR-CTR-${Date.now().toString().slice(-6)}`;
+  const checkInDate = bookingData.checkInDate || bookingData.date;
+  const checkOutDate = bookingData.checkOutDate || '';
+  const nights = bookingData.nights || 1;
+  const stayNote = checkOutDate
+    ? `Stay: ${checkInDate} to ${checkOutDate} (${nights} ${nights === 1 ? 'night' : 'nights'})`
+    : '';
+  const combinedNotes = [bookingData.notes, stayNote].filter(Boolean).join(' | ');
+
   const record = {
     id: bookingId,
     guest_name: bookingData.name,
     guest_email: bookingData.email,
     guest_phone: bookingData.phone,
-    check_in_date: bookingData.date,
+    check_in_date: checkInDate,
     room_type: bookingData.roomType,
     amount: bookingData.amount,
     payment_method: 'Pay at Counter / Property',
     status: 'Pending at Check-in',
-    notes: bookingData.notes || '',
+    notes: combinedNotes,
     created_at: new Date().toISOString(),
   };
 
@@ -141,11 +159,15 @@ export async function submitCounterBooking(bookingData) {
     name: bookingData.name,
     email: bookingData.email,
     phone: bookingData.phone,
-    date: bookingData.date,
+    date: checkInDate,
+    checkInDate,
+    checkOutDate,
+    nights,
     roomType: bookingData.roomType,
     amount: bookingData.amount,
     paymentMethod: 'Pay at Counter / Property',
     status: 'Pending at Check-in',
+    notes: combinedNotes,
     createdAt: record.created_at,
   });
 
@@ -232,19 +254,27 @@ export async function createRazorpayOrder({ amount, currency = 'INR', receipt, n
  */
 export async function submitOnlineBooking(bookingData) {
   const bookingId = `MSR-RZP-${Date.now().toString().slice(-6)}`;
+  const checkInDate = bookingData.checkInDate || bookingData.date;
+  const checkOutDate = bookingData.checkOutDate || '';
+  const nights = bookingData.nights || 1;
+  const stayNote = checkOutDate
+    ? `Stay: ${checkInDate} to ${checkOutDate} (${nights} ${nights === 1 ? 'night' : 'nights'})`
+    : '';
+  const combinedNotes = [bookingData.notes, stayNote].filter(Boolean).join(' | ');
+
   const record = {
     id: bookingId,
     guest_name: bookingData.name,
     guest_email: bookingData.email,
     guest_phone: bookingData.phone,
-    check_in_date: bookingData.date,
+    check_in_date: checkInDate,
     room_type: bookingData.roomType,
     amount: bookingData.amount,
     payment_method: 'Online Pre-payment (Razorpay)',
     status: 'Paid Online',
     payment_id: bookingData.paymentId,
     order_id: bookingData.orderId,
-    notes: bookingData.notes || '',
+    notes: combinedNotes,
     created_at: new Date().toISOString(),
   };
 
@@ -253,12 +283,16 @@ export async function submitOnlineBooking(bookingData) {
     name: bookingData.name,
     email: bookingData.email,
     phone: bookingData.phone,
-    date: bookingData.date,
+    date: checkInDate,
+    checkInDate,
+    checkOutDate,
+    nights,
     roomType: bookingData.roomType,
     amount: bookingData.amount,
     paymentMethod: 'Online Pre-payment (Razorpay)',
     status: 'Paid Online',
     paymentId: bookingData.paymentId,
+    notes: combinedNotes,
     createdAt: record.created_at,
   });
 

@@ -17,7 +17,7 @@
     "preview:admin": "vite preview admin --config admin/vite.config.js",
     "deploy": "gh-pages -d dist",
     "deploy:guest": "gh-pages -d dist",
-    "deploy:admin": "gh-pages -d admin/dist -b gh-pages-admin"
+    "deploy:admin": "gh-pages -d dist/admin -b gh-pages-admin"
   },
   "dependencies": {
     "cors": "^2.8.6",

@@ -1,11 +1,19 @@
 import { useState } from 'react';
 import { API_BASE_URL, SUPABASE_URL, SUPABASE_KEY } from '../config';
 
+function generateWalkInBookingId() {
+  return `MSR-WLK-${Math.floor(100000 + Math.random() * 900000)}`;
+}
+
 export default function WalkInBookingModal({ isOpen, onClose, token, prices, onBookingCreated }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [checkOutDate, setCheckOutDate] = useState(() => {
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    return tomorrow.toISOString().split('T')[0];
+  });
   const [roomType, setRoomType] = useState('Suite Room (₹2,500/night)');
   const [paymentMethod, setPaymentMethod] = useState('Cash at Counter');
   const [status, setStatus] = useState('Paid at Counter');
@@ -13,16 +21,82 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!isOpen) return null;
+  const calculateNights = (inDate, outDate) => {
+    if (!inDate || !outDate) return 1;
+    const d1 = new Date(inDate + 'T00:00:00');
+    const d2 = new Date(outDate + 'T00:00:00');
+    const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+    return diff > 0 ? diff : 1;
+  };
 
-  const currentPrice = roomType.includes('Dormitory')
-    ? (prices?.dormPrice || 450)
-    : (prices?.suitePrice || 2500);
+  const calculateStayTotal = (inDate, outDate, rType) => {
+    const isDorm = (rType || '').includes('Dormitory');
+    const baseSuite = prices?.suitePrice || 2500;
+    const baseDorm = prices?.dormPrice || 450;
+    const defaultRate = isDorm ? baseDorm : baseSuite;
+    if (!inDate) return defaultRate;
+
+    let flexi = null;
+    try {
+      const saved = localStorage.getItem('wdpcs_flexi_rates');
+      if (saved) flexi = JSON.parse(saved);
+    } catch {
+      // Local fallback
+    }
+
+    const d1 = new Date(inDate + 'T00:00:00');
+    const d2 = outDate ? new Date(outDate + 'T00:00:00') : new Date(d1.getTime() + 86400000);
+    let total = 0;
+    const current = new Date(d1);
+
+    while (current < d2) {
+      const dStr = current.toISOString().split('T')[0];
+      let dayRate = isDorm ? baseDorm : baseSuite;
+      if (flexi) {
+        const activeSeason = (flexi.seasonalRules || []).find(
+          (rule) => rule.enabled && dStr >= rule.startDate && dStr <= rule.endDate
+        );
+        if (activeSeason) {
+          dayRate = isDorm ? Number(activeSeason.dormPrice) : Number(activeSeason.suitePrice);
+        } else if (flexi.weekendPricing?.enabled) {
+          const dow = current.getDay();
+          const weekendDays = flexi.weekendPricing.days || [5, 6, 0];
+          if (weekendDays.includes(dow)) {
+            dayRate = isDorm ? Number(flexi.weekendPricing.dormPrice) : Number(flexi.weekendPricing.suitePrice);
+          }
+        }
+      }
+      total += dayRate;
+      current.setDate(current.getDate() + 1);
+    }
+    return total > 0 ? total : defaultRate;
+  };
+
+  const nights = calculateNights(date, checkOutDate);
+  const currentPrice = calculateStayTotal(date, checkOutDate, roomType);
+  const ratePerNight = Math.round(currentPrice / nights);
+
+  const handleInDateChange = (newInDate) => {
+    setDate(newInDate);
+    if (!checkOutDate || checkOutDate <= newInDate) {
+      const nextDay = new Date(new Date(newInDate + 'T00:00:00').getTime() + 86400000)
+        .toISOString()
+        .split('T')[0];
+      setCheckOutDate(nextDay);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+
+    if (checkOutDate <= date) {
+      setErrorMsg('Check-out date must be after check-in date (minimum 1 night stay).');
+      return;
+    }
+
     setIsSubmitting(true);
+    const combinedNotes = [notes.trim(), `Stay: ${date} to ${checkOutDate} (${nights} nights)`].filter(Boolean).join(' | ');
 
     // 1. Try Node backend API
     try {
@@ -37,10 +111,14 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
           phone: phone.trim(),
           email: email.trim() || `${phone.replace(/\D/g, '')}@walkin.wdpcs.in`,
           date,
+          checkInDate: date,
+          checkOutDate,
+          nights,
           roomType,
+          amount: currentPrice,
           paymentMethod,
           status,
-          notes: notes.trim(),
+          notes: combinedNotes,
         }),
       });
 
@@ -56,7 +134,7 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
 
     // 2. Direct Supabase Cloud Fallback
     try {
-      const bookingId = `MSR-WLK-${Date.now().toString().slice(-6)}`;
+      const bookingId = generateWalkInBookingId();
       const cleanPhone = phone.trim() || '+91 70250 17611';
       const cleanEmail = email.trim() || `${phone.replace(/\D/g, '') || 'walkin'}@wdpcs.in`;
 
@@ -78,7 +156,7 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
           amount: currentPrice,
           payment_method: 'Pay at Counter / Property',
           status: status || 'Paid at Counter',
-          notes: notes.trim() || '',
+          notes: combinedNotes,
         }),
       });
 
@@ -96,6 +174,8 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
       setIsSubmitting(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
@@ -172,14 +252,24 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
               <input
                 type="date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => handleInDateChange(e.target.value)}
                 required
-                className="w-full rounded-2xl border border-slate-300 bg-white p-2 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 font-medium"
+                className="w-full rounded-2xl border border-slate-300 bg-white p-2.5 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 font-medium"
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">Check-out Date *</label>
+              <input
+                type="date"
+                value={checkOutDate}
+                min={date}
+                onChange={(e) => setCheckOutDate(e.target.value)}
+                required
+                className="w-full rounded-2xl border border-slate-300 bg-white p-2.5 text-slate-900 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 font-medium"
+              />
+            </div>
+
             <div>
               <label className="block text-slate-700 font-bold mb-1">Accommodation Type</label>
               <select
@@ -191,12 +281,24 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
                 <option value="Dormitory Bed (₹450/night)">Dormitory Bed (₹{prices?.dormPrice || 450}/night)</option>
               </select>
             </div>
+          </div>
 
-            <div>
-              <label className="block text-slate-700 font-bold mb-1">Total Due</label>
-              <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-2.5 text-emerald-700 font-extrabold text-sm">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-slate-600">
+              <span>🌙</span>
+              <span>Stay Duration:</span>
+              <span className="font-bold text-slate-900 bg-white border border-slate-200 px-2 py-0.5 rounded-lg">
+                {nights} {nights === 1 ? 'Night' : 'Nights'}
+              </span>
+            </div>
+            <div className="text-right">
+              <span className="text-slate-500 mr-1.5">Total Tariff:</span>
+              <span className="text-base font-extrabold text-emerald-700">
                 ₹{currentPrice.toLocaleString('en-IN')}
-              </div>
+              </span>
+              <span className="block text-[10px] text-slate-400">
+                (avg ₹{ratePerNight.toLocaleString('en-IN')}/night)
+              </span>
             </div>
           </div>
 

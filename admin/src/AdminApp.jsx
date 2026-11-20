@@ -16,17 +16,60 @@ import WalkInBookingModal from './components/WalkInBookingModal';
 import UserProfileModal from './components/UserProfileModal';
 
 function formatSupabaseBooking(b) {
+  const checkIn = b.check_in_date || b.checkInDate || b.date || '';
+  let checkOut = b.check_out_date || b.checkOutDate || '';
+  let nights = Number(b.nights) || 0;
+  const notes = b.notes || '';
+
+  // Extract check-out date & duration from notes if missing
+  if (!checkOut && notes.includes('Stay:')) {
+    const stayMatch = notes.match(/Stay:\s*([0-9-]+)\s*to\s*([0-9-]+)\s*\((\d+)\s*night/i);
+    if (stayMatch) {
+      checkOut = stayMatch[2];
+      nights = Number(stayMatch[3]) || 1;
+    }
+  }
+
+  if (checkIn && checkOut && !nights) {
+    const d1 = new Date(checkIn + 'T00:00:00');
+    const d2 = new Date(checkOut + 'T00:00:00');
+    const diff = Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+    nights = diff > 0 ? diff : 1;
+  }
+  if (!nights) nights = 1;
+
+  let discountAmount = Number(b.discountAmount || b.discount_amount) || 0;
+  let discountReason = b.discountReason || b.discount_reason || '';
+  if (!discountAmount && notes.includes('Discount ₹')) {
+    const discMatch = notes.match(/Discount\s*₹\s*(\d+)(?:\s*\((.*?)\))?/i);
+    if (discMatch) {
+      discountAmount = Number(discMatch[1]) || 0;
+      discountReason = discMatch[2] || 'Staff privilege discount';
+    }
+  }
+
+  const rawAmount = Number(b.amount) || 0;
+  const originalAmount = b.originalAmount !== undefined
+    ? Number(b.originalAmount)
+    : (discountAmount > 0 ? rawAmount + discountAmount : rawAmount);
+
   return {
     id: b.id,
     name: b.name || b.guest_name || '',
     email: b.email || b.guest_email || '',
     phone: b.phone || b.guest_phone || '',
-    date: b.date || b.check_in_date || '',
+    date: checkIn,
+    checkInDate: checkIn,
+    checkOutDate: checkOut,
+    nights,
     roomType: b.roomType || b.room_type || '',
-    amount: Number(b.amount) || 0,
+    amount: rawAmount,
+    originalAmount,
+    discountAmount,
+    discountReason,
     paymentMethod: b.paymentMethod || b.payment_method || 'Pay at Counter / Property',
     status: b.status || 'Pending at Check-in',
-    notes: b.notes || '',
+    notes,
     paymentId: b.paymentId || b.payment_id || null,
     orderId: b.orderId || b.order_id || null,
     createdAt: b.createdAt || b.created_at || new Date().toISOString(),
@@ -219,7 +262,7 @@ export default function AdminApp() {
   );
 
   // Status changer
-  const handleStatusChange = async (id, newStatus) => {
+  const handleStatusChange = async (id, newStatus, extraData = {}) => {
     let updated = false;
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/bookings/${id}`, {
@@ -228,15 +271,32 @@ export default function AdminApp() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: newStatus, ...extraData }),
       });
-      if (res.ok) updated = true;
+      if (res.ok) {
+        const data = await res.json();
+        if (data.booking) {
+          setBookings((prev) => {
+            const next = prev.map((b) => (b.id === id ? { ...b, ...data.booking } : b));
+            setStats(calculateStatsFromBookings(next));
+            return next;
+          });
+          return true;
+        }
+        updated = true;
+      }
     } catch {
       // Backend unreachable, fallback to Supabase direct below
     }
 
     if (!updated) {
       try {
+        const payload = { status: newStatus };
+        if (extraData.finalAmount !== undefined) payload.amount = extraData.finalAmount;
+        if (extraData.discountAmount > 0) {
+          const discountNote = `Discount ₹${extraData.discountAmount} (${extraData.discountReason || 'Staff discount'})`;
+          payload.notes = discountNote;
+        }
         const sbRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.${id}`, {
           method: 'PATCH',
           headers: {
@@ -245,7 +305,7 @@ export default function AdminApp() {
             Authorization: `Bearer ${SUPABASE_KEY}`,
             Prefer: 'return=minimal',
           },
-          body: JSON.stringify({ status: newStatus }),
+          body: JSON.stringify(payload),
         });
         if (sbRes.ok) updated = true;
       } catch (err) {
@@ -255,11 +315,22 @@ export default function AdminApp() {
 
     if (updated) {
       setBookings((prev) => {
-        const next = prev.map((b) => (b.id === id ? { ...b, status: newStatus } : b));
+        const next = prev.map((b) =>
+          b.id === id
+            ? {
+                ...b,
+                status: newStatus,
+                ...extraData,
+                amount: extraData.finalAmount !== undefined ? extraData.finalAmount : b.amount,
+              }
+            : b
+        );
         setStats(calculateStatsFromBookings(next));
         return next;
       });
+      return true;
     }
+    return false;
   };
 
   // Delete booking

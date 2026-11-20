@@ -33,7 +33,17 @@ export default function BookingModal({ bookingConfirmation, onClose }) {
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">Check-in Date:</span>
-            <span className="font-semibold text-slate-800">{bookingConfirmation.date}</span>
+            <span className="font-semibold text-slate-800">{bookingConfirmation.checkInDate || bookingConfirmation.date} (1:00 PM)</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">Check-out Date:</span>
+            <span className="font-semibold text-slate-800">{bookingConfirmation.checkOutDate || 'Next Day'} (12:00 PM)</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-slate-500">Duration of Stay:</span>
+            <span className="font-semibold text-slate-800">
+              {bookingConfirmation.nights || 1} {(bookingConfirmation.nights || 1) === 1 ? 'Night' : 'Nights'}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">Accommodation:</span>
@@ -73,7 +83,9 @@ export default function BookingModal({ bookingConfirmation, onClose }) {
                 `• *Guest Name:* ${bookingConfirmation.name}\n` +
                 `• *Contact Number:* ${bookingConfirmation.phone}\n` +
                 `• *Email:* ${bookingConfirmation.email}\n` +
-                `• *Check-in Date:* ${bookingConfirmation.date}\n` +
+                `• *Check-in Date:* ${bookingConfirmation.checkInDate || bookingConfirmation.date}\n` +
+                `• *Check-out Date:* ${bookingConfirmation.checkOutDate || 'Next Day'}\n` +
+                `• *Duration:* ${bookingConfirmation.nights || 1} night(s)\n` +
                 `• *Accommodation:* ${bookingConfirmation.roomType}\n` +
                 `• *Total Due:* ₹${(bookingConfirmation.amount || 0).toLocaleString('en-IN')}\n` +
                 `• *Payment Status:* ${bookingConfirmation.status}\n\n` +
