@@ -35,6 +35,16 @@ export default function BookingWizard({
     d.setDate(d.getDate() + 1);
     return d;
   }, [formData.checkInDate]);
+
+  const isDorm = (formData.roomType || '').includes('Dormitory');
+  const maxUnits = Math.min(
+    isDorm ? 15 : 5,
+    Math.max(1, selectedAvailableCount || (isDorm ? 15 : 5))
+  );
+  const currentUnits = Math.max(1, Number(formData.roomCount) || 1);
+  const unitLabel = isDorm
+    ? currentUnits === 1 ? 'Bed' : 'Beds'
+    : currentUnits === 1 ? 'Room' : 'Rooms';
   return (
     <section id="booking" className="bg-slate-900 px-6 py-20 text-white">
       <div className="mx-auto mb-12 max-w-5xl text-center">
@@ -153,12 +163,15 @@ export default function BookingWizard({
 
                 {/* Duration of Stay Callout */}
                 {formData.checkInDate && formData.checkOutDate && (
-                  <div className="flex items-center justify-between rounded-2xl bg-slate-950/80 border border-slate-700/80 px-4 py-3 text-xs">
-                    <div className="flex items-center gap-2 text-slate-300">
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-950/80 border border-slate-700/80 px-4 py-3 text-xs">
+                    <div className="flex flex-wrap items-center gap-2 text-slate-300">
                       <span className="text-base">🌙</span>
                       <span>Stay Duration:</span>
                       <span className="font-bold text-white bg-blue-600/40 border border-blue-500/40 px-2.5 py-0.5 rounded-full">
                         {nights} {nights === 1 ? 'Night' : 'Nights'}
+                      </span>
+                      <span className="font-bold text-emerald-300 bg-emerald-600/30 border border-emerald-500/40 px-2.5 py-0.5 rounded-full">
+                        {currentUnits} {unitLabel}
                       </span>
                     </div>
                     <div className="text-right text-slate-300">
@@ -170,23 +183,43 @@ export default function BookingWizard({
                   </div>
                 )}
 
-                <div>
-                  <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-300">
-                    Accommodation Type *
-                  </label>
-                  <select
-                    name="roomType"
-                    value={formData.roomType}
-                    onChange={handleInputChange}
-                    className="w-full rounded-2xl border border-white/10 bg-slate-900 px-5 py-4 text-white outline-none focus:border-blue-500 text-sm font-medium"
-                  >
-                    <option value="Suite Room (₹2,500/night)">
-                      Suite Room (₹{suitePrice.toLocaleString('en-IN')} / night)
-                    </option>
-                    <option value="Dormitory Bed (₹450/night)">
-                      Dormitory Bed (₹{dormPrice.toLocaleString('en-IN')} / night)
-                    </option>
-                  </select>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-300">
+                      Accommodation Type *
+                    </label>
+                    <select
+                      name="roomType"
+                      value={formData.roomType}
+                      onChange={handleInputChange}
+                      className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3.5 text-white outline-none focus:border-blue-500 text-xs sm:text-sm font-medium"
+                    >
+                      <option value="Suite Room (₹2,500/night)">
+                        Suite Room (₹{suitePrice.toLocaleString('en-IN')} / night)
+                      </option>
+                      <option value="Dormitory Bed (₹450/night)">
+                        Dormitory Bed (₹{dormPrice.toLocaleString('en-IN')} / night)
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-300">
+                      {isDorm ? 'Beds Count *' : 'Rooms Count *'}
+                    </label>
+                    <select
+                      name="roomCount"
+                      value={currentUnits}
+                      onChange={handleInputChange}
+                      className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3.5 text-white outline-none focus:border-blue-500 text-xs sm:text-sm font-bold text-emerald-400"
+                    >
+                      {Array.from({ length: Math.max(1, maxUnits) }, (_, i) => i + 1).map((num) => (
+                        <option key={num} value={num} className="bg-slate-900 text-white">
+                          {num} {isDorm ? (num === 1 ? 'Bed' : 'Beds') : (num === 1 ? 'Room' : 'Rooms')}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {availabilityChecked && isSoldOut && (
@@ -252,7 +285,7 @@ export default function BookingWizard({
                     <span>✅ Accommodation Available!</span>
                   </h4>
                   <p className="text-xs text-slate-300 mt-1">
-                    {formData.roomType.split('(')[0].trim()} • {formData.checkInDate} to {formData.checkOutDate} ({nights} {nights === 1 ? 'night' : 'nights'}) • {selectedAvailableCount} units remaining
+                    {formData.roomType.split('(')[0].trim()} • {currentUnits} {unitLabel} • {formData.checkInDate} to {formData.checkOutDate} ({nights} {nights === 1 ? 'night' : 'nights'}) • {selectedAvailableCount} available
                   </p>
                 </div>
                 <button
@@ -347,9 +380,15 @@ export default function BookingWizard({
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-slate-300">
+                    <span>Accommodation & Units:</span>
+                    <span className="font-semibold text-emerald-300">
+                      {currentUnits} {unitLabel} ({formData.roomType.split('(')[0].trim()})
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-300">
                     <span>Rate Calculation:</span>
                     <span className="font-semibold text-slate-200">
-                      ₹{ratePerNight.toLocaleString('en-IN')} × {nights} {nights === 1 ? 'night' : 'nights'}
+                      ₹{ratePerNight.toLocaleString('en-IN')}/night × {nights} {nights === 1 ? 'night' : 'nights'} {currentUnits > 1 ? `× ${currentUnits} units` : ''}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs text-slate-300">

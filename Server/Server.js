@@ -466,6 +466,13 @@ function formatBookingFromDB(b) {
     }
   }
 
+  let roomCount = Number(b.room_count || b.roomCount) || 0;
+  if (!roomCount && notes.includes('Units:')) {
+    const uMatch = notes.match(/Units:\s*(\d+)/i);
+    if (uMatch) roomCount = Number(uMatch[1]) || 1;
+  }
+  if (!roomCount) roomCount = 1;
+
   const rawAmount = Number(b.amount) || 0;
   const originalAmount = b.originalAmount !== undefined
     ? Number(b.originalAmount)
@@ -480,6 +487,7 @@ function formatBookingFromDB(b) {
     checkInDate: checkIn,
     checkOutDate: checkOut,
     nights,
+    roomCount,
     roomType: b.roomType || b.room_type || '',
     amount: rawAmount,
     originalAmount,
@@ -510,7 +518,7 @@ async function syncWithSupabase() {
     if (rpcRes.ok) {
       const data = await rpcRes.json();
       if (Array.isArray(data)) {
-        bookings = data.map(formatBookingFromDB);
+        bookings = data.filter((b) => !b.id.startsWith('SYS-')).map(formatBookingFromDB);
         return;
       }
     }
@@ -526,7 +534,7 @@ async function syncWithSupabase() {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data)) {
-        bookings = data.map(formatBookingFromDB);
+        bookings = data.filter((b) => !b.id.startsWith('SYS-')).map(formatBookingFromDB);
       }
     }
   } catch (err) {
@@ -551,6 +559,14 @@ async function syncBookingToSupabase(record) {
       paymentMethod = 'Pay at Counter / Property';
     }
 
+    const roomCount = Math.max(1, Number(record.roomCount || record.room_count) || 1);
+    const isDorm = (record.roomType || '').includes('Dormitory');
+    const unitLabel = isDorm ? (roomCount === 1 ? 'Bed' : 'Beds') : (roomCount === 1 ? 'Room' : 'Rooms');
+    let notes = record.notes || '';
+    if (!notes.includes('Units:')) {
+      notes = notes ? `${notes} | Units: ${roomCount} ${unitLabel}` : `Units: ${roomCount} ${unitLabel}`;
+    }
+
     const payload = {
       id: record.id,
       guest_name: record.name,
@@ -561,15 +577,17 @@ async function syncBookingToSupabase(record) {
       amount: Number(record.amount) || 0,
       payment_method: paymentMethod,
       status: status,
-      notes: record.notes || '',
+      notes: notes,
       payment_id: record.paymentId || null,
       order_id: record.orderId || null,
       created_at: record.createdAt || new Date().toISOString(),
     };
 
-    const payloadWithCheckout = record.checkOutDate
-      ? { ...payload, check_out_date: record.checkOutDate }
-      : payload;
+    const payloadWithCheckout = {
+      ...payload,
+      ...(record.checkOutDate ? { check_out_date: record.checkOutDate } : {}),
+      room_count: roomCount,
+    };
 
     let res = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
       method: 'POST',
@@ -584,7 +602,7 @@ async function syncBookingToSupabase(record) {
 
     if (!res.ok && res.status === 400) {
       const errText = await res.text();
-      if (errText.includes('check_out_date')) {
+      if (errText.includes('check_out_date') || errText.includes('room_count')) {
         res = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
           method: 'POST',
           headers: {
@@ -693,9 +711,9 @@ function validateBookingData({ name, email, phone, date, checkInDate, checkOutDa
   return errors;
 }
 
-function checkRoomAvailability(date, roomType) {
+function checkRoomAvailability(date, roomType, requestedUnits = 1) {
   const isBookingActiveOnDate = (b, dStr) => {
-    if (b.status === 'Cancelled' || b.status === 'Refunded') return false;
+    if (b.status === 'Cancelled' || b.status === 'Refunded' || (b.id && b.id.startsWith('SYS-'))) return false;
     const inDate = b.checkInDate || b.date;
     const outDate = b.checkOutDate;
     if (inDate && outDate) {
@@ -709,21 +727,25 @@ function checkRoomAvailability(date, roomType) {
   const isSuite = (roomType || '').toLowerCase().includes('suite');
 
   if (isSuite) {
-    const bookedSuites = activeBookings.filter((b) => b.roomType.includes('Suite')).length;
+    const bookedSuites = activeBookings
+      .filter((b) => b.roomType.includes('Suite'))
+      .reduce((sum, b) => sum + (Number(b.roomCount) || 1), 0);
     const availableSuites = Math.max(0, TOTAL_SUITES - bookedSuites - maintenanceStatus.maintenanceSuites);
-    if (availableSuites <= 0) {
+    if (availableSuites < requestedUnits) {
       return {
         available: false,
-        error: `Suite rooms are completely booked or under maintenance on ${date}. Please choose another date.`,
+        error: `Only ${availableSuites} suite room(s) available on ${date}. Please choose another date or reduce requested units.`,
       };
     }
   } else if (isDorm) {
-    const bookedDormBeds = activeBookings.filter((b) => b.roomType.includes('Dormitory')).length;
+    const bookedDormBeds = activeBookings
+      .filter((b) => b.roomType.includes('Dormitory'))
+      .reduce((sum, b) => sum + (Number(b.roomCount) || 1), 0);
     const availableDormBeds = Math.max(0, TOTAL_DORM_BEDS - bookedDormBeds - maintenanceStatus.maintenanceDormBeds);
-    if (availableDormBeds <= 0) {
+    if (availableDormBeds < requestedUnits) {
       return {
         available: false,
-        error: `Dormitory beds are completely booked or under maintenance on ${date}. Please choose another date.`,
+        error: `Only ${availableDormBeds} dormitory bed(s) available on ${date}. Please choose another date or reduce requested units.`,
       };
     }
   }
@@ -740,7 +762,7 @@ app.get('/api/availability', async (req, res) => {
   const { date } = req.query;
 
   const isBookingActiveOnDate = (b, dStr) => {
-    if (b.status === 'Cancelled' || b.status === 'Refunded') return false;
+    if (b.status === 'Cancelled' || b.status === 'Refunded' || (b.id && b.id.startsWith('SYS-'))) return false;
     const inDate = b.checkInDate || b.date;
     const outDate = b.checkOutDate;
     if (inDate && outDate) {
@@ -750,11 +772,15 @@ app.get('/api/availability', async (req, res) => {
   };
 
   const activeBookings = bookings.filter(
-    (b) => b.status !== 'Cancelled' && (!date || isBookingActiveOnDate(b, date))
+    (b) => b.status !== 'Cancelled' && (!b.id || !b.id.startsWith('SYS-')) && (!date || isBookingActiveOnDate(b, date))
   );
 
-  const bookedSuites = activeBookings.filter((b) => b.roomType.includes('Suite')).length;
-  const bookedDormBeds = activeBookings.filter((b) => b.roomType.includes('Dormitory')).length;
+  const bookedSuites = activeBookings
+    .filter((b) => b.roomType.includes('Suite'))
+    .reduce((sum, b) => sum + (Number(b.roomCount) || 1), 0);
+  const bookedDormBeds = activeBookings
+    .filter((b) => b.roomType.includes('Dormitory'))
+    .reduce((sum, b) => sum + (Number(b.roomCount) || 1), 0);
 
   const availableSuites = Math.max(0, TOTAL_SUITES - bookedSuites - maintenanceStatus.maintenanceSuites);
   const availableDormBeds = Math.max(0, TOTAL_DORM_BEDS - bookedDormBeds - maintenanceStatus.maintenanceDormBeds);
@@ -840,7 +866,8 @@ app.post('/book-counter', async (req, res) => {
       return res.status(400).json({ success: false, error: validationErrors[0], errors: validationErrors });
     }
 
-    const availCheck = checkRoomAvailability(actualCheckIn, roomType);
+    const roomCount = Math.max(1, Number(req.body.roomCount) || 1);
+    const availCheck = checkRoomAvailability(actualCheckIn, roomType, roomCount);
     if (!availCheck.available) {
       return res.status(400).json({ success: false, error: availCheck.error });
     }
@@ -854,7 +881,7 @@ app.post('/book-counter', async (req, res) => {
     }
 
     const bookingId = 'MSR-CTR-' + Math.floor(100000 + Math.random() * 900000);
-    const amount = customAmount ? Number(customAmount) : calculateStayAmount(actualCheckIn, actualCheckOut, roomType);
+    const amount = customAmount ? Number(customAmount) : calculateStayAmount(actualCheckIn, actualCheckOut, roomType) * roomCount;
 
     const newBooking = {
       id: bookingId,
@@ -865,10 +892,12 @@ app.post('/book-counter', async (req, res) => {
       checkInDate: actualCheckIn,
       checkOutDate: actualCheckOut,
       nights,
+      roomCount,
       roomType: roomType || 'Suite Room (₹2,500/night)',
       amount,
       paymentMethod: 'Pay at Counter / Property',
       status: 'Pending at Check-in',
+      notes: req.body.notes || '',
       createdAt: new Date().toISOString(),
     };
 
@@ -1089,12 +1118,16 @@ app.get('/api/admin/dashboard/stats', requireAuth(), async (req, res) => {
   await syncWithSupabase();
   const todayStr = new Date().toISOString().split('T')[0];
 
-  const todayCheckIns = bookings.filter((b) => b.date === todayStr && b.status !== 'Cancelled');
-  const todayCheckOuts = bookings.filter((b) => b.status === 'Checked In'); // In-house ready for checkout
+  const todayCheckIns = bookings.filter((b) => b.date === todayStr && b.status !== 'Cancelled' && (!b.id || !b.id.startsWith('SYS-')));
+  const todayCheckOuts = bookings.filter((b) => b.status === 'Checked In' && (!b.id || !b.id.startsWith('SYS-')));
 
-  const activeBookings = bookings.filter((b) => b.status !== 'Cancelled');
-  const occupiedSuites = activeBookings.filter((b) => b.roomType.includes('Suite') && (b.status === 'Checked In' || b.date === todayStr)).length;
-  const occupiedDormBeds = activeBookings.filter((b) => b.roomType.includes('Dormitory') && (b.status === 'Checked In' || b.date === todayStr)).length;
+  const activeBookings = bookings.filter((b) => b.status !== 'Cancelled' && (!b.id || !b.id.startsWith('SYS-')));
+  const occupiedSuites = activeBookings
+    .filter((b) => b.roomType.includes('Suite') && (b.status === 'Checked In' || b.date === todayStr))
+    .reduce((sum, b) => sum + (Number(b.roomCount) || 1), 0);
+  const occupiedDormBeds = activeBookings
+    .filter((b) => b.roomType.includes('Dormitory') && (b.status === 'Checked In' || b.date === todayStr))
+    .reduce((sum, b) => sum + (Number(b.roomCount) || 1), 0);
 
   const totalCapacity = TOTAL_SUITES + TOTAL_DORM_BEDS;
   const totalOccupied = occupiedSuites + occupiedDormBeds;
@@ -1197,7 +1230,8 @@ app.post('/api/admin/bookings/walkin', requireAuth(['admin', 'manager', 'recepti
   }
 
   const bookingId = 'MSR-CTR-' + Math.floor(100000 + Math.random() * 900000);
-  const calculatedAmount = Number(amount) || calculateStayAmount(actualCheckIn, actualCheckOut, roomType);
+  const roomCount = Math.max(1, Number(req.body.roomCount) || 1);
+  const calculatedAmount = Number(amount) || (calculateStayAmount(actualCheckIn, actualCheckOut, roomType) * roomCount);
 
   const newBooking = {
     id: bookingId,
@@ -1208,6 +1242,7 @@ app.post('/api/admin/bookings/walkin', requireAuth(['admin', 'manager', 'recepti
     checkInDate: actualCheckIn,
     checkOutDate: actualCheckOut,
     nights,
+    roomCount,
     roomType,
     amount: calculatedAmount,
     paymentMethod: paymentMethod || 'Cash at Counter',
@@ -1298,12 +1333,24 @@ app.delete('/api/admin/bookings/:id', requireAuth(['admin', 'manager']), async (
 app.get('/api/admin/inventory', requireAuth(), async (req, res) => {
   await syncWithSupabase();
   const todayStr = new Date().toISOString().split('T')[0];
-  const activeBookings = bookings.filter((b) => b.date === todayStr && b.status !== 'Cancelled');
+  const activeBookings = bookings.filter((b) => b.date === todayStr && b.status !== 'Cancelled' && (!b.id || !b.id.startsWith('SYS-')));
+
+  const suiteBookings = [];
+  activeBookings.filter((b) => b.roomType.includes('Suite')).forEach((b) => {
+    const count = Number(b.roomCount) || 1;
+    for (let k = 0; k < count; k++) suiteBookings.push(b);
+  });
+
+  const dormBookings = [];
+  activeBookings.filter((b) => b.roomType.includes('Dormitory')).forEach((b) => {
+    const count = Number(b.roomCount) || 1;
+    for (let k = 0; k < count; k++) dormBookings.push(b);
+  });
 
   const suiteList = Array.from({ length: TOTAL_SUITES }, (_, i) => {
     const suiteNo = i + 1;
     const isUnderMaint = suiteNo <= maintenanceStatus.maintenanceSuites;
-    const booked = activeBookings.filter((b) => b.roomType.includes('Suite'))[i];
+    const booked = suiteBookings[i];
     return {
       id: `SUITE-${suiteNo}`,
       number: `Suite 10${suiteNo}`,
@@ -1318,7 +1365,7 @@ app.get('/api/admin/inventory', requireAuth(), async (req, res) => {
   const dormList = Array.from({ length: TOTAL_DORM_BEDS }, (_, i) => {
     const bedNo = i + 1;
     const isUnderMaint = bedNo <= maintenanceStatus.maintenanceDormBeds;
-    const booked = activeBookings.filter((b) => b.roomType.includes('Dormitory'))[i];
+    const booked = dormBookings[i];
     return {
       id: `DORM-${bedNo}`,
       number: `Bed D-${bedNo < 10 ? '0' + bedNo : bedNo}`,

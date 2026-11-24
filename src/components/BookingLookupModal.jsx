@@ -91,6 +91,10 @@ export default function BookingLookupModal({ isOpen, onClose }) {
               <div class="label">Accommodation</div>
               <div class="val">${booking.roomType}</div>
             </div>
+            <div>
+              <div class="label">Units Reserved</div>
+              <div class="val">${booking.roomCount || 1} ${(booking.roomType || '').includes('Dormitory') ? ((booking.roomCount || 1) === 1 ? 'Bed' : 'Beds') : ((booking.roomCount || 1) === 1 ? 'Room' : 'Rooms')}</div>
+            </div>
           </div>
 
           <div class="amount-box">
@@ -221,6 +225,9 @@ export default function BookingLookupModal({ isOpen, onClose }) {
                         <span className="text-[10px] text-slate-500 font-bold uppercase block">Accommodation</span>
                         <span className="font-semibold text-slate-800 truncate block">
                           {booking.roomType}
+                        </span>
+                        <span className="text-[11px] font-bold text-emerald-700 block">
+                          {booking.roomCount || 1} {(booking.roomType || '').includes('Dormitory') ? ((booking.roomCount || 1) === 1 ? 'Bed' : 'Beds') : ((booking.roomCount || 1) === 1 ? 'Room' : 'Rooms')}
                         </span>
                       </div>
                       <div>

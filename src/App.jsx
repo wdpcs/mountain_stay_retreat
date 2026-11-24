@@ -74,6 +74,7 @@ export default function StayFacilityWebsite() {
     checkInDate: '',
     checkOutDate: '',
     roomType: 'Suite Room (₹2,500/night)',
+    roomCount: 1,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState('');
@@ -151,13 +152,15 @@ export default function StayFacilityWebsite() {
   };
 
   const nights = calculateNights(formData.checkInDate, formData.checkOutDate);
-  const totalAmount = calculateStayTotal(
+  const roomCount = Math.max(1, Number(formData.roomCount) || 1);
+  const singleUnitTotal = calculateStayTotal(
     formData.checkInDate,
     formData.checkOutDate,
     formData.roomType,
     availability
   );
-  const ratePerNight = Math.round(totalAmount / nights);
+  const ratePerNight = Math.round(singleUnitTotal / nights);
+  const totalAmount = singleUnitTotal * roomCount;
 
   const roomAmounts = {
     'Suite Room (₹2,500/night)': suitePrice,
@@ -207,7 +210,7 @@ export default function StayFacilityWebsite() {
       }
       return next;
     });
-    if (name === 'checkInDate' || name === 'checkOutDate' || name === 'roomType') {
+    if (name === 'checkInDate' || name === 'checkOutDate' || name === 'roomType' || name === 'roomCount') {
       setAvailabilityChecked(false);
     }
   };
@@ -274,6 +277,10 @@ export default function StayFacilityWebsite() {
     if (isSoldOut) {
       return 'Sorry, this accommodation is fully booked or under maintenance on the selected date.';
     }
+    const isDorm = formData.roomType.includes('Dormitory');
+    if (roomCount > selectedAvailableCount) {
+      return `Only ${selectedAvailableCount} ${isDorm ? 'bed(s)' : 'suite(s)'} available on the selected date. Please reduce your requested quantity.`;
+    }
     return null;
   };
 
@@ -303,6 +310,7 @@ export default function StayFacilityWebsite() {
         checkOutDate: formData.checkOutDate,
         nights,
         roomType: formData.roomType,
+        roomCount,
         amount: totalAmount,
         ratePerNight,
       });
@@ -318,6 +326,7 @@ export default function StayFacilityWebsite() {
           checkOutDate: formData.checkOutDate,
           nights,
           roomType: formData.roomType,
+          roomCount,
           paymentMethod: 'Pay at Counter / Property',
           status: 'Pending at Check-in',
           amount: totalAmount,
@@ -407,6 +416,7 @@ export default function StayFacilityWebsite() {
             checkInDate: '',
             checkOutDate: '',
             roomType: 'Suite Room (₹2,500/night)',
+            roomCount: 1,
           });
         }}
       />

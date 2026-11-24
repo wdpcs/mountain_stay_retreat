@@ -53,42 +53,107 @@ export const saveLocalBooking = (booking) => {
 };
 
 /**
- * Fetch room availability for a specific check-in date.
+ * Fetch room availability and live tariffs for a specific check-in date.
  */
 export async function getRoomAvailability(dateStr = '') {
+  const targetDate = dateStr || new Date().toISOString().split('T')[0];
+  let cloudPrices = null;
+  let cloudFlexi = null;
+
   if (isSupabaseConfigured()) {
     try {
-      const response = await fetch(
-        `${SUPABASE_URL}/rest/v1/rpc/get_room_availability`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            target_date: dateStr || new Date().toISOString().split('T')[0],
-          }),
-        }
-      );
+      // 1. Fetch live system rates config and active bookings in parallel from Supabase Cloud
+      const [configRes, bookingsRes] = await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.SYS-RATES-CONFIG`, {
+          headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+        }),
+        fetch(
+          `${SUPABASE_URL}/rest/v1/bookings?select=*&status=not.in.(Cancelled,Refunded)&id=not.like.SYS-*`,
+          {
+            headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+          }
+        ),
+      ]);
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data && typeof data === 'object') {
-          return data;
+      if (configRes.ok) {
+        const rows = await configRes.json();
+        if (rows.length > 0 && rows[0].notes) {
+          try {
+            const parsed = JSON.parse(rows[0].notes);
+            if (parsed.suitePrice && parsed.dormPrice) {
+              cloudPrices = {
+                suitePrice: Number(parsed.suitePrice),
+                dormPrice: Number(parsed.dormPrice),
+              };
+            }
+            if (parsed.flexiPricing) {
+              cloudFlexi = parsed.flexiPricing;
+            }
+          } catch {
+            // Ignore parse error
+          }
         }
       }
+
+      if (bookingsRes.ok) {
+        const activeRows = await bookingsRes.json();
+        const isRowActiveOnDate = (b, dStr) => {
+          const inDate = b.check_in_date || b.checkInDate || b.date;
+          let outDate = b.check_out_date || b.checkOutDate;
+          if (!outDate && b.notes && b.notes.includes('Stay:')) {
+            const m = b.notes.match(/Stay:\s*([0-9-]+)\s*to\s*([0-9-]+)/i);
+            if (m) outDate = m[2];
+          }
+          if (inDate && outDate) {
+            return dStr >= inDate && dStr < outDate;
+          }
+          return inDate === dStr;
+        };
+
+        const getRowUnits = (b) => {
+          if (b.room_count) return Number(b.room_count) || 1;
+          if (b.roomCount) return Number(b.roomCount) || 1;
+          if (b.notes && b.notes.includes('Units:')) {
+            const m = b.notes.match(/Units:\s*(\d+)/i);
+            if (m) return Number(m[1]) || 1;
+          }
+          return 1;
+        };
+
+        const bookedSuites = activeRows
+          .filter((b) => isRowActiveOnDate(b, targetDate) && (b.room_type || b.roomType || '').includes('Suite'))
+          .reduce((sum, b) => sum + getRowUnits(b), 0);
+
+        const bookedDorms = activeRows
+          .filter((b) => isRowActiveOnDate(b, targetDate) && (b.room_type || b.roomType || '').includes('Dormitory'))
+          .reduce((sum, b) => sum + getRowUnits(b), 0);
+
+        const finalPrices = cloudPrices || DEFAULT_SETTINGS.roomPrices;
+
+        return {
+          totalSuites: DEFAULT_SETTINGS.totalSuites,
+          bookedSuites,
+          availableSuites: Math.max(0, DEFAULT_SETTINGS.totalSuites - bookedSuites),
+          maintenanceSuites: 0,
+          totalDormBeds: DEFAULT_SETTINGS.totalDormBeds,
+          bookedDormBeds: bookedDorms,
+          availableDormBeds: Math.max(0, DEFAULT_SETTINGS.totalDormBeds - bookedDorms),
+          maintenanceDormBeds: 0,
+          roomPrices: finalPrices,
+          basePrices: finalPrices,
+          flexiPricing: cloudFlexi,
+        };
+      }
     } catch (err) {
-      console.warn('Supabase availability fetch failed, falling back to local calculation:', err);
+      console.warn('Supabase live availability fetch error, falling back:', err);
     }
   }
 
   // Fallback: If legacy API_BASE_URL is set, attempt it
   if (API_BASE_URL) {
     try {
-      const url = dateStr
-        ? `${API_BASE_URL}/api/availability?date=${dateStr}`
+      const url = targetDate
+        ? `${API_BASE_URL}/api/availability?date=${targetDate}`
         : `${API_BASE_URL}/api/availability`;
       const res = await fetch(url);
       if (res.ok) {
@@ -112,12 +177,15 @@ export async function getRoomAvailability(dateStr = '') {
     return inDate === dStr;
   };
 
-  const bookedSuites = localBookings.filter(
-    (b) => isBookingActiveOnDate(b, dateStr) && b.roomType.includes('Suite')
-  ).length;
-  const bookedDorms = localBookings.filter(
-    (b) => isBookingActiveOnDate(b, dateStr) && b.roomType.includes('Dormitory')
-  ).length;
+  const getLocalUnits = (b) => Number(b.roomCount || b.quantity || b.units) || 1;
+
+  const bookedSuites = localBookings
+    .filter((b) => isBookingActiveOnDate(b, targetDate) && (b.roomType || '').includes('Suite'))
+    .reduce((sum, b) => sum + getLocalUnits(b), 0);
+
+  const bookedDorms = localBookings
+    .filter((b) => isBookingActiveOnDate(b, targetDate) && (b.roomType || '').includes('Dormitory'))
+    .reduce((sum, b) => sum + getLocalUnits(b), 0);
 
   return {
     ...DEFAULT_SETTINGS,
@@ -136,9 +204,13 @@ export async function submitCounterBooking(bookingData) {
   const checkInDate = bookingData.checkInDate || bookingData.date;
   const checkOutDate = bookingData.checkOutDate || '';
   const nights = bookingData.nights || 1;
+  const roomCount = Math.max(1, Number(bookingData.roomCount) || 1);
+  const isDorm = (bookingData.roomType || '').includes('Dormitory');
+  const unitLabel = isDorm ? (roomCount === 1 ? 'Bed' : 'Beds') : (roomCount === 1 ? 'Room' : 'Rooms');
+
   const stayNote = checkOutDate
-    ? `Stay: ${checkInDate} to ${checkOutDate} (${nights} ${nights === 1 ? 'night' : 'nights'})`
-    : '';
+    ? `Stay: ${checkInDate} to ${checkOutDate} (${nights} ${nights === 1 ? 'night' : 'nights'}) | Units: ${roomCount} ${unitLabel}`
+    : `Units: ${roomCount} ${unitLabel}`;
   const combinedNotes = [bookingData.notes, stayNote].filter(Boolean).join(' | ');
 
   const baseRecord = {
@@ -155,9 +227,11 @@ export async function submitCounterBooking(bookingData) {
     created_at: new Date().toISOString(),
   };
 
-  const payloadWithCheckout = checkOutDate
-    ? { ...baseRecord, check_out_date: checkOutDate }
-    : baseRecord;
+  const payloadWithDetails = {
+    ...baseRecord,
+    ...(checkOutDate ? { check_out_date: checkOutDate } : {}),
+    room_count: roomCount,
+  };
 
   // Always mirror to localStorage as offline safety net
   saveLocalBooking({
@@ -169,6 +243,7 @@ export async function submitCounterBooking(bookingData) {
     checkInDate,
     checkOutDate,
     nights,
+    roomCount,
     roomType: bookingData.roomType,
     paymentMethod: 'Pay at Counter / Property',
     status: 'Pending at Check-in',
@@ -178,6 +253,7 @@ export async function submitCounterBooking(bookingData) {
 
   if (isSupabaseConfigured()) {
     try {
+      // 1. Attempt insert with dedicated columns (check_out_date, room_count)
       let res = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
         method: 'POST',
         headers: {
@@ -186,14 +262,14 @@ export async function submitCounterBooking(bookingData) {
           Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
           Prefer: 'return=minimal',
         },
-        body: JSON.stringify(payloadWithCheckout),
+        body: JSON.stringify(payloadWithDetails),
       });
 
-      // If schema does not yet have check_out_date column, retry with base record
+      // 2. If schema does not yet have extra columns, retry with base record
       if (!res.ok && res.status === 400) {
         const errorText = await res.text();
-        if (errorText.includes('check_out_date')) {
-          console.warn('Supabase check_out_date column not in cache; inserting with dates in notes.');
+        if (errorText.includes('check_out_date') || errorText.includes('room_count')) {
+          console.warn('Supabase schema missing extra columns; retrying with details in notes.');
           res = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
             method: 'POST',
             headers: {
@@ -226,11 +302,11 @@ export async function submitCounterBooking(bookingData) {
       const res = await fetch(`${API_BASE_URL}/book-counter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bookingData),
+        body: JSON.stringify({ ...bookingData, roomCount }),
       });
       if (res.ok) {
         const data = await res.json();
-        return { success: true, bookingId: data.bookingId || bookingId };
+        return { success: true, bookingId: data.bookingId || bookingId, syncedToCloud: true };
       }
     } catch {
       // Fall through to local success
@@ -401,6 +477,13 @@ export async function lookupBooking(searchQuery) {
             }
             if (!nights) nights = 1;
 
+            let roomCount = Number(b.room_count || b.roomCount) || 0;
+            if (!roomCount && notes.includes('Units:')) {
+              const uMatch = notes.match(/Units:\s*(\d+)/i);
+              if (uMatch) roomCount = Number(uMatch[1]) || 1;
+            }
+            if (!roomCount) roomCount = 1;
+
             return {
               bookingId: b.id,
               id: b.id,
@@ -411,6 +494,7 @@ export async function lookupBooking(searchQuery) {
               checkInDate: checkIn,
               checkOutDate: checkOut,
               nights,
+              roomCount,
               roomType: b.room_type || b.roomType || '',
               amount: Number(b.amount) || 0,
               paymentMethod: b.payment_method || b.paymentMethod || 'Pay at Counter / Property',
@@ -455,6 +539,7 @@ export async function lookupBooking(searchQuery) {
         checkInDate: b.checkInDate || b.date,
         checkOutDate: b.checkOutDate,
         nights: b.nights || 1,
+        roomCount: b.roomCount || 1,
         roomType: b.roomType,
         amount: b.amount,
         paymentMethod: b.paymentMethod,

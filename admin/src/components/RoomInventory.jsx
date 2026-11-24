@@ -33,6 +33,43 @@ const DEFAULT_FLEXI = {
   ],
 };
 
+async function saveRatesToSupabaseConfig(prices, flexi) {
+  try {
+    const configPayload = {
+      id: 'SYS-RATES-CONFIG',
+      guest_name: 'SYSTEM RATES CONFIGURATION',
+      guest_email: 'admin@wdpcs.in',
+      guest_phone: '+91 70250 17611',
+      check_in_date: '2099-12-31',
+      room_type: 'System Config',
+      amount: 0,
+      payment_method: 'Pay at Counter / Property',
+      status: 'Cancelled',
+      notes: JSON.stringify({
+        suitePrice: Number(prices.suitePrice),
+        dormPrice: Number(prices.dormPrice),
+        flexiPricing: flexi,
+        updatedAt: new Date().toISOString(),
+      }),
+    };
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        Prefer: 'resolution=merge-duplicates,return=representation',
+      },
+      body: JSON.stringify(configPayload),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('Failed to sync rates config to Supabase:', err);
+    return false;
+  }
+}
+
 export default function RoomInventory({ token, bookings = [], onPricesUpdated }) {
   const [inventory, setInventory] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -78,7 +115,33 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
     let suitePrice = 2500;
     let dormPrice = 450;
 
-    // Try fetching live prices from Supabase Cloud
+    // 1. Try fetching live prices and flexi rates from SYS-RATES-CONFIG in Supabase Cloud
+    try {
+      const cfgRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.SYS-RATES-CONFIG`, {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      });
+      if (cfgRes.ok) {
+        const rows = await cfgRes.json();
+        if (rows.length > 0 && rows[0].notes) {
+          const parsed = JSON.parse(rows[0].notes);
+          if (parsed.suitePrice && parsed.dormPrice) {
+            suitePrice = Number(parsed.suitePrice);
+            dormPrice = Number(parsed.dormPrice);
+          }
+          if (parsed.flexiPricing) {
+            setFlexiPricing(parsed.flexiPricing);
+            localStorage.setItem('wdpcs_flexi_rates', JSON.stringify(parsed.flexiPricing));
+          }
+        }
+      }
+    } catch {
+      // Fallback preserved
+    }
+
+    // 2. Also inspect rooms table
     try {
       const sbRes = await fetch(`${SUPABASE_URL}/rest/v1/rooms?select=*`, {
         headers: {
@@ -90,8 +153,8 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
         const rooms = await sbRes.json();
         const sRoom = rooms.find((r) => r.category === 'suite' || (r.id && r.id.includes('suite')));
         const dRoom = rooms.find((r) => r.category === 'dormitory' || (r.id && r.id.includes('dorm')));
-        if (sRoom?.default_price) suitePrice = sRoom.default_price;
-        if (dRoom?.default_price) dormPrice = dRoom.default_price;
+        if (sRoom?.default_price && !suitePrice) suitePrice = sRoom.default_price;
+        if (dRoom?.default_price && !dormPrice) dormPrice = dRoom.default_price;
       }
     } catch {
       // Fallback prices preserved
@@ -113,10 +176,19 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
 
     const todayStr = new Date().toISOString().split('T')[0];
     const todayBookings = (bookings || []).filter(
-      (b) => b.date === todayStr && b.status !== 'Cancelled'
+      (b) => b.date === todayStr && b.status !== 'Cancelled' && (!b.id || !b.id.startsWith('SYS-'))
     );
-    const suiteBookings = todayBookings.filter((b) => (b.roomType || '').includes('Suite'));
-    const dormBookings = todayBookings.filter((b) => (b.roomType || '').includes('Dormitory'));
+    const suiteBookings = [];
+    todayBookings.filter((b) => (b.roomType || '').includes('Suite')).forEach((b) => {
+      const count = Number(b.roomCount) || 1;
+      for (let k = 0; k < count; k++) suiteBookings.push(b);
+    });
+
+    const dormBookings = [];
+    todayBookings.filter((b) => (b.roomType || '').includes('Dormitory')).forEach((b) => {
+      const count = Number(b.roomCount) || 1;
+      for (let k = 0; k < count; k++) dormBookings.push(b);
+    });
 
     const suiteList = Array.from({ length: TOTAL_SUITES }, (_, i) => {
       const suiteNo = i + 1;
@@ -204,7 +276,33 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
       // Fallback
     }
 
-    // Try fetching live flexi rates
+    // Fetch live flexi rates & tariffs from Supabase SYS-RATES-CONFIG
+    try {
+      const cfgRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.SYS-RATES-CONFIG`, {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      });
+      if (cfgRes.ok) {
+        const rows = await cfgRes.json();
+        if (rows.length > 0 && rows[0].notes) {
+          const parsed = JSON.parse(rows[0].notes);
+          if (parsed.suitePrice && parsed.dormPrice) {
+            setSuitePriceInput(Number(parsed.suitePrice));
+            setDormPriceInput(Number(parsed.dormPrice));
+          }
+          if (parsed.flexiPricing) {
+            setFlexiPricing(parsed.flexiPricing);
+            localStorage.setItem('wdpcs_flexi_rates', JSON.stringify(parsed.flexiPricing));
+          }
+        }
+      }
+    } catch {
+      // Fallback preserved
+    }
+
+    // Try fetching live flexi rates from backend API
     try {
       const flexiRes = await fetch(`${API_BASE_URL}/api/admin/flexi-rates`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -234,6 +332,15 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
     e.preventDefault();
     setPriceSuccess('');
     let saved = false;
+
+    // 1. Sync to Supabase SYS-RATES-CONFIG (instant live update across all guest frontends)
+    const sbConfigSaved = await saveRatesToSupabaseConfig(
+      { suitePrice: suitePriceInput, dormPrice: dormPriceInput },
+      flexiPricing
+    );
+    if (sbConfigSaved) saved = true;
+
+    // 2. Try Node backend API
     try {
       const res = await fetch(`${API_BASE_URL}/api/admin/prices`, {
         method: 'POST',
@@ -254,9 +361,10 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
       // Fallback
     }
 
-    if (!saved) {
-      try {
-        await fetch(`${SUPABASE_URL}/rest/v1/rooms?id=eq.suite-executive`, {
+    // 3. Attempt PATCH /rooms if accessible
+    try {
+      await Promise.all([
+        fetch(`${SUPABASE_URL}/rest/v1/rooms?id=eq.suite-executive`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -264,8 +372,8 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
             Authorization: `Bearer ${SUPABASE_KEY}`,
           },
           body: JSON.stringify({ default_price: Number(suitePriceInput) }),
-        });
-        await fetch(`${SUPABASE_URL}/rest/v1/rooms?id=eq.dorm-bed`, {
+        }),
+        fetch(`${SUPABASE_URL}/rest/v1/rooms?id=eq.dorm-bed`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -273,15 +381,14 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
             Authorization: `Bearer ${SUPABASE_KEY}`,
           },
           body: JSON.stringify({ default_price: Number(dormPriceInput) }),
-        });
-        saved = true;
-      } catch (err) {
-        console.error('Failed to update prices on Supabase:', err);
-      }
+        }),
+      ]);
+    } catch (err) {
+      console.warn('Note: Direct rooms table patch skipped; SYS-RATES-CONFIG active.', err);
     }
 
     if (saved) {
-      setPriceSuccess('✅ Standard base rates updated successfully!');
+      setPriceSuccess('✅ Standard base rates updated & synchronized live to website!');
       if (onPricesUpdated) onPricesUpdated();
       fetchInventory();
       setTimeout(() => setPriceSuccess(''), 3000);
@@ -427,6 +534,12 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
     setIsSavingFlexi(true);
     setFlexiSuccess('');
 
+    // 1. Sync live to Supabase SYS-RATES-CONFIG so guest booking portal sees rates in real-time
+    await saveRatesToSupabaseConfig(
+      { suitePrice: suitePriceInput, dormPrice: dormPriceInput },
+      flexiPricing
+    );
+
     try {
       await fetch(`${API_BASE_URL}/api/admin/flexi-rates`, {
         method: 'POST',
@@ -444,7 +557,7 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
     localStorage.setItem('wdpcs_flexi_rates', JSON.stringify(flexiPricing));
 
     setIsSavingFlexi(false);
-    setFlexiSuccess('✅ Flexi rate system saved & broadcasted live!');
+    setFlexiSuccess('✅ Flexi rate system saved & broadcasted live to website!');
     if (onPricesUpdated) onPricesUpdated();
     setTimeout(() => setFlexiSuccess(''), 4000);
   };

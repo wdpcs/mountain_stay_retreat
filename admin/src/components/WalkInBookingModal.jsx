@@ -15,11 +15,16 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
     return tomorrow.toISOString().split('T')[0];
   });
   const [roomType, setRoomType] = useState('Suite Room (₹2,500/night)');
+  const [roomCount, setRoomCount] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('Cash at Counter');
   const [status, setStatus] = useState('Paid at Counter');
   const [notes, setNotes] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const isDorm = (roomType || '').includes('Dormitory');
+  const maxUnits = isDorm ? 15 : 5;
+  const unitLabel = isDorm ? (roomCount === 1 ? 'Bed' : 'Beds') : (roomCount === 1 ? 'Room' : 'Rooms');
 
   const calculateNights = (inDate, outDate) => {
     if (!inDate || !outDate) return 1;
@@ -73,8 +78,9 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
   };
 
   const nights = calculateNights(date, checkOutDate);
-  const currentPrice = calculateStayTotal(date, checkOutDate, roomType);
-  const ratePerNight = Math.round(currentPrice / nights);
+  const singleUnitTotal = calculateStayTotal(date, checkOutDate, roomType);
+  const currentPrice = singleUnitTotal * roomCount;
+  const ratePerNight = Math.round(singleUnitTotal / nights);
 
   const handleInDateChange = (newInDate) => {
     setDate(newInDate);
@@ -96,7 +102,10 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
     }
 
     setIsSubmitting(true);
-    const combinedNotes = [notes.trim(), `Stay: ${date} to ${checkOutDate} (${nights} nights)`].filter(Boolean).join(' | ');
+    const combinedNotes = [
+      notes.trim(),
+      `Stay: ${date} to ${checkOutDate} (${nights} nights) | Units: ${roomCount} ${unitLabel}`,
+    ].filter(Boolean).join(' | ');
 
     // 1. Try Node backend API
     try {
@@ -115,6 +124,7 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
           checkOutDate,
           nights,
           roomType,
+          roomCount,
           amount: currentPrice,
           paymentMethod,
           status,
@@ -145,6 +155,7 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
         guest_phone: cleanPhone,
         check_in_date: date,
         room_type: roomType,
+        room_count: roomCount,
         amount: currentPrice,
         payment_method: 'Pay at Counter / Property',
         status: status || 'Paid at Counter',
@@ -168,7 +179,19 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
 
       if (!sbRes.ok && sbRes.status === 400) {
         const errText = await sbRes.text();
-        if (errText.includes('check_out_date')) {
+        if (errText.includes('check_out_date') || errText.includes('room_count')) {
+          const fallbackNoExtraCols = {
+            id: bookingId,
+            guest_name: name.trim(),
+            guest_email: cleanEmail,
+            guest_phone: cleanPhone,
+            check_in_date: date,
+            room_type: roomType,
+            amount: currentPrice,
+            payment_method: 'Pay at Counter / Property',
+            status: status || 'Paid at Counter',
+            notes: combinedNotes,
+          };
           sbRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
             method: 'POST',
             headers: {
@@ -177,7 +200,7 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
               Authorization: `Bearer ${SUPABASE_KEY}`,
               Prefer: 'return=minimal',
             },
-            body: JSON.stringify(baseWalkInPayload),
+            body: JSON.stringify(fallbackNoExtraCols),
           });
         }
       }
@@ -296,21 +319,44 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
               <label className="block text-slate-700 font-bold mb-1">Accommodation Type</label>
               <select
                 value={roomType}
-                onChange={(e) => setRoomType(e.target.value)}
+                onChange={(e) => {
+                  setRoomType(e.target.value);
+                  setRoomCount(1);
+                }}
                 className="w-full rounded-2xl border border-slate-300 bg-white p-2.5 text-slate-900 outline-none focus:border-blue-600 font-medium"
               >
                 <option value="Suite Room (₹2,500/night)">Suite Room (₹{prices?.suitePrice || 2500}/night)</option>
                 <option value="Dormitory Bed (₹450/night)">Dormitory Bed (₹{prices?.dormPrice || 450}/night)</option>
               </select>
             </div>
+
+            <div>
+              <label className="block text-slate-700 font-bold mb-1">
+                {isDorm ? 'Beds Count' : 'Rooms Count'}
+              </label>
+              <select
+                value={roomCount}
+                onChange={(e) => setRoomCount(Number(e.target.value) || 1)}
+                className="w-full rounded-2xl border border-slate-300 bg-white p-2.5 text-emerald-700 font-bold outline-none focus:border-blue-600 font-medium"
+              >
+                {Array.from({ length: maxUnits }, (_, i) => i + 1).map((num) => (
+                  <option key={num} value={num}>
+                    {num} {isDorm ? (num === 1 ? 'Bed' : 'Beds') : (num === 1 ? 'Room' : 'Rooms')}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-slate-600">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-1.5 text-slate-600">
               <span>🌙</span>
               <span>Stay Duration:</span>
               <span className="font-bold text-slate-900 bg-white border border-slate-200 px-2 py-0.5 rounded-lg">
                 {nights} {nights === 1 ? 'Night' : 'Nights'}
+              </span>
+              <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                {roomCount} {unitLabel}
               </span>
             </div>
             <div className="text-right">
@@ -319,7 +365,7 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
                 ₹{currentPrice.toLocaleString('en-IN')}
               </span>
               <span className="block text-[10px] text-slate-400">
-                (avg ₹{ratePerNight.toLocaleString('en-IN')}/night)
+                (₹{ratePerNight.toLocaleString('en-IN')}/night × {nights}n × {roomCount}u)
               </span>
             </div>
           </div>

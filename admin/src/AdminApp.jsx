@@ -48,6 +48,13 @@ function formatSupabaseBooking(b) {
     }
   }
 
+  let roomCount = Number(b.room_count || b.roomCount) || 0;
+  if (!roomCount && notes.includes('Units:')) {
+    const uMatch = notes.match(/Units:\s*(\d+)/i);
+    if (uMatch) roomCount = Number(uMatch[1]) || 1;
+  }
+  if (!roomCount) roomCount = 1;
+
   const rawAmount = Number(b.amount) || 0;
   const originalAmount = b.originalAmount !== undefined
     ? Number(b.originalAmount)
@@ -62,6 +69,7 @@ function formatSupabaseBooking(b) {
     checkInDate: checkIn,
     checkOutDate: checkOut,
     nights,
+    roomCount,
     roomType: b.roomType || b.room_type || '',
     amount: rawAmount,
     originalAmount,
@@ -76,7 +84,8 @@ function formatSupabaseBooking(b) {
   };
 }
 
-function calculateStatsFromBookings(bookingList) {
+function calculateStatsFromBookings(rawBookingList) {
+  const bookingList = (rawBookingList || []).filter((b) => !b.id.startsWith('SYS-'));
   const activeBookings = bookingList.filter((b) => b.status !== 'Cancelled' && b.status !== 'Refunded');
   const checkedIn = bookingList.filter((b) => b.status === 'Checked In');
   const todayStr = new Date().toISOString().split('T')[0];
@@ -86,8 +95,12 @@ function calculateStatsFromBookings(bookingList) {
   const counterBookings = activeBookings.filter((b) => !b.paymentMethod?.toLowerCase().includes('online') && !b.paymentMethod?.toLowerCase().includes('razorpay'));
   const onlineBookings = activeBookings.filter((b) => b.paymentMethod?.toLowerCase().includes('online') || b.paymentMethod?.toLowerCase().includes('razorpay'));
 
-  const todaySuites = activeBookings.filter((b) => (b.checkInDate || b.date) === todayStr && b.roomType.includes('Suite')).length;
-  const todayDormBeds = activeBookings.filter((b) => (b.checkInDate || b.date) === todayStr && b.roomType.includes('Dormitory')).length;
+  const todaySuites = activeBookings
+    .filter((b) => (b.checkInDate || b.date) === todayStr && b.roomType.includes('Suite'))
+    .reduce((sum, b) => sum + (b.roomCount || 1), 0);
+  const todayDormBeds = activeBookings
+    .filter((b) => (b.checkInDate || b.date) === todayStr && b.roomType.includes('Dormitory'))
+    .reduce((sum, b) => sum + (b.roomCount || 1), 0);
 
   const totalCapacity = 20; // 5 suites + 15 dorm beds
   const totalOccupied = checkedIn.length + todayCheckIns.length;
@@ -232,7 +245,8 @@ export default function AdminApp() {
       });
       if (res.ok) {
         const data = await res.json();
-        setBookings(data.bookings || []);
+        const cleanBookings = (data.bookings || []).filter((b) => !b.id.startsWith('SYS-'));
+        setBookings(cleanBookings);
         return;
       }
     } catch {
@@ -249,7 +263,9 @@ export default function AdminApp() {
       });
       if (sbRes.ok) {
         const data = await sbRes.json();
-        const formatted = Array.isArray(data) ? data.map(formatSupabaseBooking) : [];
+        const formatted = Array.isArray(data)
+          ? data.filter((b) => !b.id.startsWith('SYS-')).map(formatSupabaseBooking)
+          : [];
         setBookings(formatted);
         setStats(calculateStatsFromBookings(formatted));
       }

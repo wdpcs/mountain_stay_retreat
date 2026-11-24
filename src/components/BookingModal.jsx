@@ -50,6 +50,12 @@ export default function BookingModal({ bookingConfirmation, onClose }) {
             <span className="font-semibold text-slate-800">{bookingConfirmation.roomType}</span>
           </div>
           <div className="flex justify-between">
+            <span className="text-slate-500">Units Reserved:</span>
+            <span className="font-bold text-emerald-700">
+              {bookingConfirmation.roomCount || 1} {(bookingConfirmation.roomType || '').includes('Dormitory') ? ((bookingConfirmation.roomCount || 1) === 1 ? 'Bed' : 'Beds') : ((bookingConfirmation.roomCount || 1) === 1 ? 'Room' : 'Rooms')}
+            </span>
+          </div>
+          <div className="flex justify-between">
             <span className="text-slate-500">Total Amount:</span>
             <span className="font-bold text-slate-900">₹{(bookingConfirmation.amount || 0).toLocaleString('en-IN')}</span>
           </div>
@@ -97,6 +103,7 @@ export default function BookingModal({ bookingConfirmation, onClose }) {
                 `• *Check-out Date:* ${bookingConfirmation.checkOutDate || 'Next Day'}\n` +
                 `• *Duration:* ${bookingConfirmation.nights || 1} night(s)\n` +
                 `• *Accommodation:* ${bookingConfirmation.roomType}\n` +
+                `• *Units Booked:* ${bookingConfirmation.roomCount || 1} ${(bookingConfirmation.roomType || '').includes('Dormitory') ? 'Bed(s)' : 'Room(s)'}\n` +
                 `• *Total Due:* ₹${(bookingConfirmation.amount || 0).toLocaleString('en-IN')}\n` +
                 `• *Payment Status:* ${bookingConfirmation.status}\n\n` +
                 `Please confirm room readiness. Thank you!`
