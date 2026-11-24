@@ -84,6 +84,26 @@ function formatSupabaseBooking(b) {
   };
 }
 
+function getSavedRoomPrices() {
+  try {
+    const saved = localStorage.getItem('wdpcs_base_prices');
+    if (saved) return JSON.parse(saved);
+  } catch {
+    // Ignore
+  }
+  return { suitePrice: 2500, dormPrice: 450 };
+}
+
+function getSavedFlexiPricing() {
+  try {
+    const saved = localStorage.getItem('wdpcs_flexi_rates');
+    if (saved) return JSON.parse(saved);
+  } catch {
+    // Ignore
+  }
+  return null;
+}
+
 function getRowCounts(b) {
   let suites = 0;
   let dorms = 0;
@@ -190,6 +210,8 @@ function calculateStatsFromBookings(rawBookingList) {
       counter: { count: counterBookings.length, revenue: counterBookings.reduce((s, b) => s + (b.amount || 0), 0) },
     },
     bookingsRoster: bookingList,
+    roomPrices: getSavedRoomPrices(),
+    flexiPricing: getSavedFlexiPricing(),
   };
 }
 
@@ -266,10 +288,49 @@ export default function AdminApp() {
       if (res.ok) {
         const data = await res.json();
         setStats(data);
+        if (data.roomPrices) {
+          localStorage.setItem('wdpcs_base_prices', JSON.stringify(data.roomPrices));
+        }
+        if (data.flexiPricing) {
+          localStorage.setItem('wdpcs_flexi_rates', JSON.stringify(data.flexiPricing));
+        }
         return;
       }
     } catch {
-      // Fallback: Stats are computed directly from bookings in fetchBookings
+      // Fallback: Query Supabase SYS-RATES-CONFIG below
+    }
+
+    // Direct Supabase Cloud rates & stats sync
+    try {
+      const cfgRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.SYS-RATES-CONFIG`, {
+        headers: {
+          apikey: SUPABASE_KEY,
+          Authorization: `Bearer ${SUPABASE_KEY}`,
+        },
+      });
+      if (cfgRes.ok) {
+        const rows = await cfgRes.json();
+        if (rows.length > 0 && rows[0].notes) {
+          const parsed = JSON.parse(rows[0].notes);
+          if (parsed.suitePrice && parsed.dormPrice) {
+            const livePrices = {
+              suitePrice: Number(parsed.suitePrice),
+              dormPrice: Number(parsed.dormPrice),
+            };
+            localStorage.setItem('wdpcs_base_prices', JSON.stringify(livePrices));
+            if (parsed.flexiPricing) {
+              localStorage.setItem('wdpcs_flexi_rates', JSON.stringify(parsed.flexiPricing));
+            }
+            setStats((prev) => ({
+              ...(prev || {}),
+              roomPrices: livePrices,
+              flexiPricing: parsed.flexiPricing || prev?.flexiPricing || null,
+            }));
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Supabase SYS-RATES-CONFIG fetch error in fetchStats:', err);
     }
   }, [token, handleLogout]);
 
@@ -303,7 +364,11 @@ export default function AdminApp() {
           ? data.filter((b) => !b.id.startsWith('SYS-')).map(formatSupabaseBooking)
           : [];
         setBookings(formatted);
-        setStats(calculateStatsFromBookings(formatted));
+        setStats((prev) => ({
+          ...calculateStatsFromBookings(formatted),
+          roomPrices: prev?.roomPrices || getSavedRoomPrices(),
+          flexiPricing: prev?.flexiPricing || getSavedFlexiPricing(),
+        }));
       }
     } catch (err) {
       console.warn('Supabase direct bookings fetch error:', err);

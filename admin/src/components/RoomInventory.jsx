@@ -318,11 +318,9 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
       // Local fallback preserved
     }
 
-    if (!inventory) {
-      await computeFallbackInventory();
-    }
+    await computeFallbackInventory();
     setLoading(false);
-  }, [token, computeFallbackInventory, inventory]);
+  }, [token, computeFallbackInventory]);
 
   useEffect(() => {
     fetchInventory();
@@ -333,9 +331,15 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
     setPriceSuccess('');
     let saved = false;
 
+    const sPrice = Number(suitePriceInput);
+    const dPrice = Number(dormPriceInput);
+
+    // Save to localStorage immediately
+    localStorage.setItem('wdpcs_base_prices', JSON.stringify({ suitePrice: sPrice, dormPrice: dPrice }));
+
     // 1. Sync to Supabase SYS-RATES-CONFIG (instant live update across all guest frontends)
     const sbConfigSaved = await saveRatesToSupabaseConfig(
-      { suitePrice: suitePriceInput, dormPrice: dormPriceInput },
+      { suitePrice: sPrice, dormPrice: dPrice },
       flexiPricing
     );
     if (sbConfigSaved) saved = true;
@@ -349,8 +353,8 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          suitePrice: Number(suitePriceInput),
-          dormPrice: Number(dormPriceInput),
+          suitePrice: sPrice,
+          dormPrice: dPrice,
         }),
       });
 
@@ -371,7 +375,7 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
             apikey: SUPABASE_KEY,
             Authorization: `Bearer ${SUPABASE_KEY}`,
           },
-          body: JSON.stringify({ default_price: Number(suitePriceInput) }),
+          body: JSON.stringify({ default_price: sPrice }),
         }),
         fetch(`${SUPABASE_URL}/rest/v1/rooms?id=eq.dorm-bed`, {
           method: 'PATCH',
@@ -380,17 +384,27 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
             apikey: SUPABASE_KEY,
             Authorization: `Bearer ${SUPABASE_KEY}`,
           },
-          body: JSON.stringify({ default_price: Number(dormPriceInput) }),
+          body: JSON.stringify({ default_price: dPrice }),
         }),
       ]);
     } catch (err) {
       console.warn('Note: Direct rooms table patch skipped; SYS-RATES-CONFIG active.', err);
     }
 
+    // Update inventory state directly so UI changes immediately
+    setInventory((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        roomPrices: { suitePrice: sPrice, dormPrice: dPrice },
+        suiteList: (prev.suiteList || []).map((s) => ({ ...s, rate: sPrice })),
+        dormList: (prev.dormList || []).map((d) => ({ ...d, rate: dPrice })),
+      };
+    });
+
     if (saved) {
       setPriceSuccess('✅ Standard base rates updated & synchronized live to website!');
       if (onPricesUpdated) onPricesUpdated();
-      fetchInventory();
       setTimeout(() => setPriceSuccess(''), 3000);
     }
   };
@@ -555,6 +569,7 @@ export default function RoomInventory({ token, bookings = [], onPricesUpdated })
 
     // Always mirror to localStorage
     localStorage.setItem('wdpcs_flexi_rates', JSON.stringify(flexiPricing));
+    localStorage.setItem('wdpcs_base_prices', JSON.stringify({ suitePrice: Number(suitePriceInput), dormPrice: Number(dormPriceInput) }));
 
     setIsSavingFlexi(false);
     setFlexiSuccess('✅ Flexi rate system saved & broadcasted live to website!');

@@ -85,9 +85,19 @@ export async function getRoomAvailability(dateStr = '') {
                 suitePrice: Number(parsed.suitePrice),
                 dormPrice: Number(parsed.dormPrice),
               };
+              try {
+                localStorage.setItem('wdpcs_base_prices', JSON.stringify(cloudPrices));
+              } catch {
+                // Ignore storage error
+              }
             }
             if (parsed.flexiPricing) {
               cloudFlexi = parsed.flexiPricing;
+              try {
+                localStorage.setItem('wdpcs_flexi_rates', JSON.stringify(cloudFlexi));
+              } catch {
+                // Ignore storage error
+              }
             }
           } catch {
             // Ignore parse error
@@ -209,12 +219,31 @@ export async function getRoomAvailability(dateStr = '') {
     .filter((b) => isBookingActiveOnDate(b, targetDate) && (b.roomType || '').includes('Dormitory'))
     .reduce((sum, b) => sum + getLocalUnits(b), 0);
 
+  let localPrices = DEFAULT_SETTINGS.roomPrices;
+  try {
+    const savedP = localStorage.getItem('wdpcs_base_prices');
+    if (savedP) localPrices = JSON.parse(savedP);
+  } catch {
+    // Ignore
+  }
+
+  let localFlexi = null;
+  try {
+    const savedF = localStorage.getItem('wdpcs_flexi_rates');
+    if (savedF) localFlexi = JSON.parse(savedF);
+  } catch {
+    // Ignore
+  }
+
   return {
     ...DEFAULT_SETTINGS,
     bookedSuites,
     availableSuites: Math.max(0, DEFAULT_SETTINGS.totalSuites - bookedSuites),
     bookedDormBeds: bookedDorms,
     availableDormBeds: Math.max(0, DEFAULT_SETTINGS.totalDormBeds - bookedDorms),
+    roomPrices: localPrices,
+    basePrices: localPrices,
+    flexiPricing: localFlexi,
   };
 }
 

@@ -82,17 +82,28 @@ export default function StayFacilityWebsite() {
   const [bookingError, setBookingError] = useState('');
   const [bookingConfirmation, setBookingConfirmation] = useState(null);
   const [isLookupOpen, setIsLookupOpen] = useState(false);
-  const [availability, setAvailability] = useState({
-    totalSuites: 5,
-    availableSuites: 5,
-    maintenanceSuites: 0,
-    totalDormBeds: 15,
-    availableDormBeds: 15,
-    maintenanceDormBeds: 0,
-    roomPrices: {
-      suitePrice: 2500,
-      dormPrice: 450,
-    },
+  const [availability, setAvailability] = useState(() => {
+    let initialPrices = { suitePrice: 2500, dormPrice: 450 };
+    let initialFlexi = null;
+    try {
+      const savedP = localStorage.getItem('wdpcs_base_prices');
+      if (savedP) initialPrices = JSON.parse(savedP);
+      const savedF = localStorage.getItem('wdpcs_flexi_rates');
+      if (savedF) initialFlexi = JSON.parse(savedF);
+    } catch {
+      // Ignore
+    }
+    return {
+      totalSuites: 5,
+      availableSuites: 5,
+      maintenanceSuites: 0,
+      totalDormBeds: 15,
+      availableDormBeds: 15,
+      maintenanceDormBeds: 0,
+      roomPrices: initialPrices,
+      basePrices: initialPrices,
+      flexiPricing: initialFlexi,
+    };
   });
 
   const suitePrice = availability.roomPrices?.suitePrice || 2500;

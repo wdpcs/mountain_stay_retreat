@@ -518,10 +518,74 @@ function formatBookingFromDB(b) {
   };
 }
 
+async function saveRatesConfigToSupabase(prices, flexi) {
+  if (!isSupabaseConfigured()) return;
+  try {
+    const configPayload = {
+      id: 'SYS-RATES-CONFIG',
+      guest_name: 'SYSTEM RATES CONFIGURATION',
+      guest_email: 'admin@wdpcs.in',
+      guest_phone: '+91 70250 17611',
+      check_in_date: '2099-12-31',
+      room_type: 'System Config',
+      amount: 0,
+      payment_method: 'Pay at Counter / Property',
+      status: 'Cancelled',
+      notes: JSON.stringify({
+        suitePrice: Number(prices.suitePrice),
+        dormPrice: Number(prices.dormPrice),
+        flexiPricing: flexi,
+        updatedAt: new Date().toISOString(),
+      }),
+    };
+
+    await fetch(`${SUPABASE_URL}/rest/v1/bookings`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        Prefer: 'resolution=merge-duplicates,return=representation',
+      },
+      body: JSON.stringify(configPayload),
+    });
+  } catch (err) {
+    console.warn('Failed to sync rates config to Supabase:', err.message);
+  }
+}
+
 async function syncWithSupabase() {
   if (!isSupabaseConfigured()) return;
   try {
-    // 1. Try RPC get_all_bookings first
+    // 1. Sync live system rates configuration
+    const configRes = await fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.SYS-RATES-CONFIG`, {
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+      },
+    });
+    if (configRes.ok) {
+      const rows = await configRes.json();
+      if (rows.length > 0 && rows[0].notes) {
+        try {
+          const parsed = JSON.parse(rows[0].notes);
+          if (parsed.suitePrice && !isNaN(Number(parsed.suitePrice))) {
+            roomPrices.suitePrice = Number(parsed.suitePrice);
+          }
+          if (parsed.dormPrice && !isNaN(Number(parsed.dormPrice))) {
+            roomPrices.dormPrice = Number(parsed.dormPrice);
+          }
+          if (parsed.flexiPricing) {
+            flexiPricing = parsed.flexiPricing;
+            saveFlexiPricing(flexiPricing);
+          }
+        } catch {
+          // Ignore
+        }
+      }
+    }
+
+    // 2. Try RPC get_all_bookings first
     const rpcRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/get_all_bookings`, {
       method: 'POST',
       headers: {
@@ -539,7 +603,7 @@ async function syncWithSupabase() {
       }
     }
 
-    // 2. Direct table select fallback
+    // 3. Direct table select fallback
     const res = await fetch(`${SUPABASE_URL}/rest/v1/bookings?select=*&order=created_at.desc`, {
       headers: {
         apikey: SUPABASE_KEY,
@@ -901,6 +965,7 @@ app.post('/api/admin/flexi-rates', requireAuth(['admin', 'manager']), (req, res)
     flexiPricing.seasonalRules = seasonalRules;
   }
   saveFlexiPricing(flexiPricing);
+  saveRatesConfigToSupabase(roomPrices, flexiPricing);
   logAuditEvent(req.adminUser, 'UPDATE_FLEXI_RATES', 'Pricing', 'FLEXI', flexiPricing, req);
   res.json({ success: true, message: 'Flexi rate system updated successfully.', flexiPricing });
 });
@@ -1495,6 +1560,7 @@ app.post('/api/admin/prices', requireAuth(['admin', 'manager']), (req, res) => {
     roomPrices.dormPrice = Number(dormPrice);
   }
 
+  saveRatesConfigToSupabase(roomPrices, flexiPricing);
   logAuditEvent(req.adminUser, 'UPDATE_PRICES', 'Pricing', 'RATES', { oldPrices, newPrices: roomPrices }, req);
   res.json({ success: true, roomPrices });
 });
