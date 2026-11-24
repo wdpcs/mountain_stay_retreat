@@ -75,7 +75,7 @@ export default function StayFacilityWebsite() {
     checkOutDate: '',
     suiteCount: 1,
     dormBedCount: 0,
-    roomType: 'Suite Room (₹2,500/night)',
+    roomType: 'Suite Room',
     roomCount: 1,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -198,14 +198,16 @@ export default function StayFacilityWebsite() {
     if (dormBedCount > 0) {
       return `${dormBedCount} Dormitory ${dormBedCount === 1 ? 'Bed' : 'Beds'} (₹${dormPrice.toLocaleString('en-IN')}/night)`;
     }
-    return '1 Suite Room (₹2,500/night)';
+    return `1 Suite Room (₹${suitePrice.toLocaleString('en-IN')}/night)`;
   })();
 
   const roomAmounts = {
-    'Suite Room (₹2,500/night)': suitePrice,
-    'Dormitory Bed (₹450/night)': dormPrice,
     [`Suite Room (₹${suitePrice.toLocaleString('en-IN')}/night)`]: suitePrice,
     [`Dormitory Bed (₹${dormPrice.toLocaleString('en-IN')}/night)`]: dormPrice,
+    'Suite Room': suitePrice,
+    'Dormitory Bed': dormPrice,
+    'Suite Room (₹2,500/night)': suitePrice,
+    'Dormitory Bed (₹450/night)': dormPrice,
   };
 
   const fetchAvailability = useCallback(async (dateStr = '') => {
@@ -232,6 +234,17 @@ export default function StayFacilityWebsite() {
     return () => {
       isMounted = false;
     };
+  }, [formData.checkInDate, fetchAvailability]);
+
+  // Synchronize immediately if rates are updated in another tab/window
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'wdpcs_base_prices' || e.key === 'wdpcs_flexi_rates') {
+        fetchAvailability(formData.checkInDate);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, [formData.checkInDate, fetchAvailability]);
 
   const handleInputChange = (e) => {
@@ -428,7 +441,10 @@ export default function StayFacilityWebsite() {
       />
 
       <RoomsSection
-        suites={suites}
+        suites={suites.map((s) => ({
+          ...s,
+          price: `₹${suitePrice.toLocaleString('en-IN')} / night`,
+        }))}
         availability={availability}
         suitePrice={suitePrice}
         dormPrice={dormPrice}
@@ -494,7 +510,7 @@ export default function StayFacilityWebsite() {
             checkOutDate: '',
             suiteCount: 1,
             dormBedCount: 0,
-            roomType: 'Suite Room (₹2,500/night)',
+            roomType: 'Suite Room',
             roomCount: 1,
           });
         }}

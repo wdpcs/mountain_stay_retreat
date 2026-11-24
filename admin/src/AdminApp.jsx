@@ -306,7 +306,10 @@ export default function AdminApp() {
         headers: {
           apikey: SUPABASE_KEY,
           Authorization: `Bearer ${SUPABASE_KEY}`,
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
         },
+        cache: 'no-store',
       });
       if (cfgRes.ok) {
         const rows = await cfgRes.json();

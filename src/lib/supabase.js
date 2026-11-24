@@ -62,23 +62,36 @@ export async function getRoomAvailability(dateStr = '') {
 
   if (isSupabaseConfigured()) {
     try {
-      // 1. Fetch live system rates config and active bookings in parallel from Supabase Cloud
-      const [configRes, bookingsRes] = await Promise.all([
+      // 1. Fetch live system rates config and active bookings in parallel with cache-busting headers
+      const results = await Promise.allSettled([
         fetch(`${SUPABASE_URL}/rest/v1/bookings?id=eq.SYS-RATES-CONFIG`, {
-          headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+          },
+          cache: 'no-store',
         }),
         fetch(
           `${SUPABASE_URL}/rest/v1/bookings?select=*&status=not.in.(Cancelled,Refunded)&id=not.like.SYS-*`,
           {
-            headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+            },
+            cache: 'no-store',
           }
         ),
       ]);
 
-      if (configRes.ok) {
-        const rows = await configRes.json();
-        if (rows.length > 0 && rows[0].notes) {
-          try {
+      // Process live rates config from Supabase
+      if (results[0].status === 'fulfilled' && results[0].value.ok) {
+        try {
+          const rows = await results[0].value.json();
+          if (rows.length > 0 && rows[0].notes) {
             const parsed = JSON.parse(rows[0].notes);
             if (parsed.suitePrice && parsed.dormPrice) {
               cloudPrices = {
@@ -99,83 +112,135 @@ export async function getRoomAvailability(dateStr = '') {
                 // Ignore storage error
               }
             }
-          } catch {
-            // Ignore parse error
+          }
+        } catch (parseErr) {
+          console.warn('Failed to parse SYS-RATES-CONFIG notes:', parseErr);
+        }
+      }
+
+      // Base prices from Cloud or Local Storage fallback
+      const basePrices = cloudPrices || (() => {
+        try {
+          const savedP = localStorage.getItem('wdpcs_base_prices');
+          if (savedP) return JSON.parse(savedP);
+        } catch {
+          // Ignore
+        }
+        return DEFAULT_SETTINGS.roomPrices;
+      })();
+
+      // Flexi pricing rules from Cloud or Local Storage fallback
+      const flexiRules = cloudFlexi || (() => {
+        try {
+          const savedF = localStorage.getItem('wdpcs_flexi_rates');
+          if (savedF) return JSON.parse(savedF);
+        } catch {
+          // Ignore
+        }
+        return null;
+      })();
+
+      // Calculate effective daily prices for targetDate
+      let effectiveSuitePrice = basePrices.suitePrice;
+      let effectiveDormPrice = basePrices.dormPrice;
+
+      if (flexiRules && targetDate) {
+        const activeSeason = (flexiRules.seasonalRules || []).find(
+          (rule) => rule.enabled && targetDate >= rule.startDate && targetDate <= rule.endDate
+        );
+        if (activeSeason) {
+          effectiveSuitePrice = Number(activeSeason.suitePrice) || effectiveSuitePrice;
+          effectiveDormPrice = Number(activeSeason.dormPrice) || effectiveDormPrice;
+        } else if (flexiRules.weekendPricing?.enabled) {
+          const dow = new Date(targetDate + 'T00:00:00').getDay();
+          const weekendDays = flexiRules.weekendPricing.days || [5, 6, 0];
+          if (weekendDays.includes(dow)) {
+            effectiveSuitePrice = Number(flexiRules.weekendPricing.suitePrice) || effectiveSuitePrice;
+            effectiveDormPrice = Number(flexiRules.weekendPricing.dormPrice) || effectiveDormPrice;
           }
         }
       }
 
-      if (bookingsRes.ok) {
-        const activeRows = await bookingsRes.json();
-        const isRowActiveOnDate = (b, dStr) => {
-          const inDate = b.check_in_date || b.checkInDate || b.date;
-          let outDate = b.check_out_date || b.checkOutDate;
-          if (!outDate && b.notes && b.notes.includes('Stay:')) {
-            const m = b.notes.match(/Stay:\s*([0-9-]+)\s*to\s*([0-9-]+)/i);
-            if (m) outDate = m[2];
-          }
-          if (inDate && outDate) {
-            return dStr >= inDate && dStr < outDate;
-          }
-          return inDate === dStr;
-        };
+      const effectivePrices = {
+        suitePrice: effectiveSuitePrice,
+        dormPrice: effectiveDormPrice,
+      };
 
-        const getRowCounts = (b) => {
-          let sCount = 0;
-          let dCount = 0;
-          const rType = b.room_type || b.roomType || '';
-          const notes = b.notes || '';
+      // Process live bookings if fetched
+      let bookedSuites = 0;
+      let bookedDormBeds = 0;
 
-          // 1. Check notes for exact breakdown: e.g. "Units: 2 Suites, 3 Dorm Beds"
-          if (notes.includes('Units:')) {
-            const sMatch = notes.match(/(\d+)\s*Suite/i);
-            const dMatch = notes.match(/(\d+)\s*Dorm/i);
-            if (sMatch) sCount = Number(sMatch[1]) || 0;
-            if (dMatch) dCount = Number(dMatch[1]) || 0;
-          }
-
-          // 2. If both not found from notes, infer from room_type
-          if (!sCount && !dCount) {
-            const total = Number(b.room_count || b.roomCount) || 1;
-            if (rType.includes('Suite') && rType.includes('Dorm')) {
-              const sMatch = rType.match(/(\d+)\s*Suite/i);
-              const dMatch = rType.match(/(\d+)\s*Dorm/i);
-              sCount = sMatch ? Number(sMatch[1]) : 1;
-              dCount = dMatch ? Number(dMatch[1]) : 1;
-            } else if (rType.includes('Suite')) {
-              sCount = total;
-            } else if (rType.includes('Dormitory') || rType.includes('Dorm')) {
-              dCount = total;
+      if (results[1].status === 'fulfilled' && results[1].value.ok) {
+        try {
+          const activeRows = await results[1].value.json();
+          const isRowActiveOnDate = (b, dStr) => {
+            const inDate = b.check_in_date || b.checkInDate || b.date;
+            let outDate = b.check_out_date || b.checkOutDate;
+            if (!outDate && b.notes && b.notes.includes('Stay:')) {
+              const m = b.notes.match(/Stay:\s*([0-9-]+)\s*to\s*([0-9-]+)/i);
+              if (m) outDate = m[2];
             }
-          }
+            if (inDate && outDate) {
+              return dStr >= inDate && dStr < outDate;
+            }
+            return inDate === dStr;
+          };
 
-          return { suites: sCount, dorms: dCount };
-        };
+          const getRowCounts = (b) => {
+            let sCount = 0;
+            let dCount = 0;
+            const rType = b.room_type || b.roomType || '';
+            const notes = b.notes || '';
 
-        const bookedSuites = activeRows
-          .filter((b) => isRowActiveOnDate(b, targetDate))
-          .reduce((sum, b) => sum + getRowCounts(b).suites, 0);
+            if (notes.includes('Units:')) {
+              const sMatch = notes.match(/(\d+)\s*Suite/i);
+              const dMatch = notes.match(/(\d+)\s*Dorm/i);
+              if (sMatch) sCount = Number(sMatch[1]) || 0;
+              if (dMatch) dCount = Number(dMatch[1]) || 0;
+            }
 
-        const bookedDorms = activeRows
-          .filter((b) => isRowActiveOnDate(b, targetDate))
-          .reduce((sum, b) => sum + getRowCounts(b).dorms, 0);
+            if (!sCount && !dCount) {
+              const total = Number(b.room_count || b.roomCount) || 1;
+              if (rType.includes('Suite') && rType.includes('Dorm')) {
+                const sMatch = rType.match(/(\d+)\s*Suite/i);
+                const dMatch = rType.match(/(\d+)\s*Dorm/i);
+                sCount = sMatch ? Number(sMatch[1]) : 1;
+                dCount = dMatch ? Number(dMatch[1]) : 1;
+              } else if (rType.includes('Suite')) {
+                sCount = total;
+              } else if (rType.includes('Dormitory') || rType.includes('Dorm')) {
+                dCount = total;
+              }
+            }
 
-        const finalPrices = cloudPrices || DEFAULT_SETTINGS.roomPrices;
+            return { suites: sCount, dorms: dCount };
+          };
 
-        return {
-          totalSuites: DEFAULT_SETTINGS.totalSuites,
-          bookedSuites,
-          availableSuites: Math.max(0, DEFAULT_SETTINGS.totalSuites - bookedSuites),
-          maintenanceSuites: 0,
-          totalDormBeds: DEFAULT_SETTINGS.totalDormBeds,
-          bookedDormBeds: bookedDorms,
-          availableDormBeds: Math.max(0, DEFAULT_SETTINGS.totalDormBeds - bookedDorms),
-          maintenanceDormBeds: 0,
-          roomPrices: finalPrices,
-          basePrices: finalPrices,
-          flexiPricing: cloudFlexi,
-        };
+          bookedSuites = activeRows
+            .filter((b) => isRowActiveOnDate(b, targetDate))
+            .reduce((sum, b) => sum + getRowCounts(b).suites, 0);
+
+          bookedDormBeds = activeRows
+            .filter((b) => isRowActiveOnDate(b, targetDate))
+            .reduce((sum, b) => sum + getRowCounts(b).dorms, 0);
+        } catch (bookingParseErr) {
+          console.warn('Failed to parse active bookings:', bookingParseErr);
+        }
       }
+
+      return {
+        totalSuites: DEFAULT_SETTINGS.totalSuites,
+        bookedSuites,
+        availableSuites: Math.max(0, DEFAULT_SETTINGS.totalSuites - bookedSuites),
+        maintenanceSuites: 0,
+        totalDormBeds: DEFAULT_SETTINGS.totalDormBeds,
+        bookedDormBeds,
+        availableDormBeds: Math.max(0, DEFAULT_SETTINGS.totalDormBeds - bookedDormBeds),
+        maintenanceDormBeds: 0,
+        roomPrices: effectivePrices,
+        basePrices: basePrices,
+        flexiPricing: flexiRules,
+      };
     } catch (err) {
       console.warn('Supabase live availability fetch error, falling back:', err);
     }
@@ -187,7 +252,13 @@ export async function getRoomAvailability(dateStr = '') {
       const url = targetDate
         ? `${API_BASE_URL}/api/availability?date=${targetDate}`
         : `${API_BASE_URL}/api/availability`;
-      const res = await fetch(url);
+      const res = await fetch(url, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        },
+        cache: 'no-store',
+      });
       if (res.ok) {
         const data = await res.json();
         if (data && typeof data === 'object') return data;
@@ -235,13 +306,36 @@ export async function getRoomAvailability(dateStr = '') {
     // Ignore
   }
 
+  let localEffectiveSuite = localPrices.suitePrice;
+  let localEffectiveDorm = localPrices.dormPrice;
+
+  if (localFlexi && targetDate) {
+    const activeSeason = (localFlexi.seasonalRules || []).find(
+      (rule) => rule.enabled && targetDate >= rule.startDate && targetDate <= rule.endDate
+    );
+    if (activeSeason) {
+      localEffectiveSuite = Number(activeSeason.suitePrice) || localEffectiveSuite;
+      localEffectiveDorm = Number(activeSeason.dormPrice) || localEffectiveDorm;
+    } else if (localFlexi.weekendPricing?.enabled) {
+      const dow = new Date(targetDate + 'T00:00:00').getDay();
+      const weekendDays = localFlexi.weekendPricing.days || [5, 6, 0];
+      if (weekendDays.includes(dow)) {
+        localEffectiveSuite = Number(localFlexi.weekendPricing.suitePrice) || localEffectiveSuite;
+        localEffectiveDorm = Number(localFlexi.weekendPricing.dormPrice) || localEffectiveDorm;
+      }
+    }
+  }
+
   return {
     ...DEFAULT_SETTINGS,
     bookedSuites,
     availableSuites: Math.max(0, DEFAULT_SETTINGS.totalSuites - bookedSuites),
     bookedDormBeds: bookedDorms,
     availableDormBeds: Math.max(0, DEFAULT_SETTINGS.totalDormBeds - bookedDorms),
-    roomPrices: localPrices,
+    roomPrices: {
+      suitePrice: localEffectiveSuite,
+      dormPrice: localEffectiveDorm,
+    },
     basePrices: localPrices,
     flexiPricing: localFlexi,
   };
