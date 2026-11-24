@@ -208,7 +208,14 @@ export default function BookingManagement({
             </div>
             <div>
               <div class="label">Accommodation Type</div>
-              <div class="val">${booking.roomType} (${booking.roomCount || 1} ${(booking.roomType || '').includes('Dormitory') ? ((booking.roomCount || 1) === 1 ? 'Bed' : 'Beds') : ((booking.roomCount || 1) === 1 ? 'Room' : 'Rooms')})</div>
+              <div class="val">${booking.roomType} (${(() => {
+                const notesStr = booking.notes || '';
+                const uMatch = notesStr.match(/Units:\s*([^|]+)/i);
+                if (uMatch) return uMatch[1].trim();
+                const isDorm = (booking.roomType || '').includes('Dormitory');
+                const cnt = booking.roomCount || 1;
+                return `${cnt} ${isDorm ? (cnt === 1 ? 'Bed' : 'Beds') : (cnt === 1 ? 'Room' : 'Rooms')}`;
+              })()})</div>
             </div>
           </div>
 
@@ -389,9 +396,17 @@ export default function BookingManagement({
                       </div>
                     </td>
                     <td className="py-3.5 px-3 text-slate-700">
-                      <div>{b.roomType}</div>
+                      <div className="font-semibold text-slate-900">{b.roomType}</div>
                       <div className="text-[11px] font-bold text-emerald-700">
-                        {b.roomCount || 1} {(b.roomType || '').includes('Dormitory') ? ((b.roomCount || 1) === 1 ? 'Bed' : 'Beds') : ((b.roomCount || 1) === 1 ? 'Room' : 'Rooms')}
+                        {(() => {
+                          const notesStr = b.notes || '';
+                          const uMatch = notesStr.match(/Units:\s*([^|]+)/i);
+                          if (uMatch) return uMatch[1].trim();
+                          if ((b.roomType || '').includes('+')) return `${b.roomCount || 1} Total Units`;
+                          const isDorm = (b.roomType || '').includes('Dormitory');
+                          const cnt = b.roomCount || 1;
+                          return `${cnt} ${isDorm ? (cnt === 1 ? 'Bed' : 'Beds') : (cnt === 1 ? 'Room' : 'Rooms')}`;
+                        })()}
                       </div>
                     </td>
                     <td className="py-3.5 px-3">
@@ -825,7 +840,15 @@ export default function BookingManagement({
                 <span className="text-slate-500 block text-[10px] font-bold uppercase">Accommodation Type</span>
                 <span className="text-slate-800 font-semibold">{selectedBooking.roomType}</span>
                 <span className="text-emerald-700 font-bold block text-xs mt-0.5">
-                  {selectedBooking.roomCount || 1} {(selectedBooking.roomType || '').includes('Dormitory') ? ((selectedBooking.roomCount || 1) === 1 ? 'Bed' : 'Beds') : ((selectedBooking.roomCount || 1) === 1 ? 'Room' : 'Rooms')}
+                  {(() => {
+                    const notesStr = selectedBooking.notes || '';
+                    const uMatch = notesStr.match(/Units:\s*([^|]+)/i);
+                    if (uMatch) return uMatch[1].trim();
+                    if ((selectedBooking.roomType || '').includes('+')) return `${selectedBooking.roomCount || 1} Total Units`;
+                    const isDorm = (selectedBooking.roomType || '').includes('Dormitory');
+                    const cnt = selectedBooking.roomCount || 1;
+                    return `${cnt} ${isDorm ? (cnt === 1 ? 'Bed' : 'Beds') : (cnt === 1 ? 'Room' : 'Rooms')}`;
+                  })()}
                 </span>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">

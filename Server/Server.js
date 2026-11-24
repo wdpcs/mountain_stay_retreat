@@ -358,7 +358,23 @@ function getDailyRate(dateStr, isDorm = false) {
   return isDorm ? roomPrices.dormPrice : roomPrices.suitePrice;
 }
 
-function calculateStayAmount(checkInDate, checkOutDate, roomType) {
+function calculateStayAmount(checkInDate, checkOutDate, roomType, suiteCount = 0, dormBedCount = 0) {
+  if (suiteCount > 0 || dormBedCount > 0) {
+    const sPrice = calculateStayAmount(checkInDate, checkOutDate, 'Suite Room');
+    const dPrice = calculateStayAmount(checkInDate, checkOutDate, 'Dormitory Bed');
+    return (sPrice * suiteCount) + (dPrice * dormBedCount);
+  }
+
+  const sMatch = (roomType || '').match(/(\d+)\s*Suite/i);
+  const dMatch = (roomType || '').match(/(\d+)\s*Dorm/i);
+  if (sMatch && dMatch) {
+    const s = parseInt(sMatch[1], 10) || 0;
+    const d = parseInt(dMatch[1], 10) || 0;
+    const sPrice = calculateStayAmount(checkInDate, checkOutDate, 'Suite Room');
+    const dPrice = calculateStayAmount(checkInDate, checkOutDate, 'Dormitory Bed');
+    return (sPrice * s) + (dPrice * d);
+  }
+
   const isDorm = (roomType || '').toLowerCase().includes('dormitory');
   if (!checkInDate) {
     return isDorm ? roomPrices.dormPrice : roomPrices.suitePrice;
@@ -711,7 +727,34 @@ function validateBookingData({ name, email, phone, date, checkInDate, checkOutDa
   return errors;
 }
 
-function checkRoomAvailability(date, roomType, requestedUnits = 1) {
+function getBookingUnitCounts(b) {
+  let suites = 0;
+  let dorms = 0;
+  const notesStr = b.notes || '';
+  const suiteMatch = notesStr.match(/(\d+)\s*Suite/i);
+  const dormMatch = notesStr.match(/(\d+)\s*Dorm/i);
+  if (suiteMatch) suites = parseInt(suiteMatch[1], 10);
+  if (dormMatch) dorms = parseInt(dormMatch[1], 10);
+
+  if (suites === 0 && dorms === 0) {
+    const typeStr = b.roomType || b.room_type || '';
+    const typeSuiteMatch = typeStr.match(/(\d+)\s*Suite/i);
+    const typeDormMatch = typeStr.match(/(\d+)\s*Dorm/i);
+    if (typeSuiteMatch) suites = parseInt(typeSuiteMatch[1], 10);
+    if (typeDormMatch) dorms = parseInt(typeDormMatch[1], 10);
+    if (suites === 0 && dorms === 0) {
+      const count = Number(b.roomCount || b.room_count) || 1;
+      if (typeStr.toLowerCase().includes('dormitory')) {
+        dorms = count;
+      } else {
+        suites = count;
+      }
+    }
+  }
+  return { suites, dorms };
+}
+
+function checkRoomAvailability(date, roomType, requestedSuites = 0, requestedDorms = 0) {
   const isBookingActiveOnDate = (b, dStr) => {
     if (b.status === 'Cancelled' || b.status === 'Refunded' || (b.id && b.id.startsWith('SYS-'))) return false;
     const inDate = b.checkInDate || b.date;
@@ -723,31 +766,45 @@ function checkRoomAvailability(date, roomType, requestedUnits = 1) {
   };
 
   const activeBookings = bookings.filter((b) => isBookingActiveOnDate(b, date));
-  const isDorm = (roomType || '').toLowerCase().includes('dormitory');
-  const isSuite = (roomType || '').toLowerCase().includes('suite');
+  let bookedSuites = 0;
+  let bookedDormBeds = 0;
+  for (const b of activeBookings) {
+    const { suites, dorms } = getBookingUnitCounts(b);
+    bookedSuites += suites;
+    bookedDormBeds += dorms;
+  }
 
-  if (isSuite) {
-    const bookedSuites = activeBookings
-      .filter((b) => b.roomType.includes('Suite'))
-      .reduce((sum, b) => sum + (Number(b.roomCount) || 1), 0);
-    const availableSuites = Math.max(0, TOTAL_SUITES - bookedSuites - maintenanceStatus.maintenanceSuites);
-    if (availableSuites < requestedUnits) {
-      return {
-        available: false,
-        error: `Only ${availableSuites} suite room(s) available on ${date}. Please choose another date or reduce requested units.`,
-      };
+  const availableSuites = Math.max(0, TOTAL_SUITES - bookedSuites - maintenanceStatus.maintenanceSuites);
+  const availableDormBeds = Math.max(0, TOTAL_DORM_BEDS - bookedDormBeds - maintenanceStatus.maintenanceDormBeds);
+
+  let reqS = Number(requestedSuites) || 0;
+  let reqD = Number(requestedDorms) || 0;
+  if (reqS === 0 && reqD === 0) {
+    const sMatch = (roomType || '').match(/(\d+)\s*Suite/i);
+    const dMatch = (roomType || '').match(/(\d+)\s*Dorm/i);
+    if (sMatch || dMatch) {
+      reqS = sMatch ? parseInt(sMatch[1], 10) : 0;
+      reqD = dMatch ? parseInt(dMatch[1], 10) : 0;
+    } else {
+      if ((roomType || '').toLowerCase().includes('dormitory')) {
+        reqD = 1;
+      } else {
+        reqS = 1;
+      }
     }
-  } else if (isDorm) {
-    const bookedDormBeds = activeBookings
-      .filter((b) => b.roomType.includes('Dormitory'))
-      .reduce((sum, b) => sum + (Number(b.roomCount) || 1), 0);
-    const availableDormBeds = Math.max(0, TOTAL_DORM_BEDS - bookedDormBeds - maintenanceStatus.maintenanceDormBeds);
-    if (availableDormBeds < requestedUnits) {
-      return {
-        available: false,
-        error: `Only ${availableDormBeds} dormitory bed(s) available on ${date}. Please choose another date or reduce requested units.`,
-      };
-    }
+  }
+
+  if (reqS > 0 && availableSuites < reqS) {
+    return {
+      available: false,
+      error: `Only ${availableSuites} suite room(s) available on ${date}. You requested ${reqS}.`,
+    };
+  }
+  if (reqD > 0 && availableDormBeds < reqD) {
+    return {
+      available: false,
+      error: `Only ${availableDormBeds} dormitory bed(s) available on ${date}. You requested ${reqD}.`,
+    };
   }
   return { available: true };
 }
@@ -775,12 +832,13 @@ app.get('/api/availability', async (req, res) => {
     (b) => b.status !== 'Cancelled' && (!b.id || !b.id.startsWith('SYS-')) && (!date || isBookingActiveOnDate(b, date))
   );
 
-  const bookedSuites = activeBookings
-    .filter((b) => b.roomType.includes('Suite'))
-    .reduce((sum, b) => sum + (Number(b.roomCount) || 1), 0);
-  const bookedDormBeds = activeBookings
-    .filter((b) => b.roomType.includes('Dormitory'))
-    .reduce((sum, b) => sum + (Number(b.roomCount) || 1), 0);
+  let bookedSuites = 0;
+  let bookedDormBeds = 0;
+  for (const b of activeBookings) {
+    const { suites, dorms } = getBookingUnitCounts(b);
+    bookedSuites += suites;
+    bookedDormBeds += dorms;
+  }
 
   const availableSuites = Math.max(0, TOTAL_SUITES - bookedSuites - maintenanceStatus.maintenanceSuites);
   const availableDormBeds = Math.max(0, TOTAL_DORM_BEDS - bookedDormBeds - maintenanceStatus.maintenanceDormBeds);
@@ -866,8 +924,10 @@ app.post('/book-counter', async (req, res) => {
       return res.status(400).json({ success: false, error: validationErrors[0], errors: validationErrors });
     }
 
-    const roomCount = Math.max(1, Number(req.body.roomCount) || 1);
-    const availCheck = checkRoomAvailability(actualCheckIn, roomType, roomCount);
+    const suiteCount = Number(req.body.suiteCount) || 0;
+    const dormBedCount = Number(req.body.dormBedCount) || 0;
+    const roomCount = Math.max(1, Number(req.body.roomCount) || (suiteCount + dormBedCount) || 1);
+    const availCheck = checkRoomAvailability(actualCheckIn, roomType, suiteCount, dormBedCount);
     if (!availCheck.available) {
       return res.status(400).json({ success: false, error: availCheck.error });
     }
@@ -881,7 +941,7 @@ app.post('/book-counter', async (req, res) => {
     }
 
     const bookingId = 'MSR-CTR-' + Math.floor(100000 + Math.random() * 900000);
-    const amount = customAmount ? Number(customAmount) : calculateStayAmount(actualCheckIn, actualCheckOut, roomType) * roomCount;
+    const amount = customAmount ? Number(customAmount) : calculateStayAmount(actualCheckIn, actualCheckOut, roomType, suiteCount, dormBedCount);
 
     const newBooking = {
       id: bookingId,
@@ -972,27 +1032,35 @@ app.post('/create-order', async (req, res) => {
 // Confirm online payment
 app.post('/api/confirm-online-booking', async (req, res) => {
   try {
-    const { id, name, email, phone, date, roomType, amount, paymentId, orderId } = req.body;
+    const { id, name, email, phone, date, checkInDate, checkOutDate, roomType, amount, paymentId, orderId } = req.body;
+    const actualCheckIn = checkInDate || date;
+    const actualCheckOut = checkOutDate || '';
 
-    const validationErrors = validateBookingData({ name, email, phone, date, roomType });
+    const validationErrors = validateBookingData({ name, email, phone, date: actualCheckIn, checkOutDate: actualCheckOut, roomType });
     if (validationErrors.length > 0) {
       return res.status(400).json({ success: false, error: validationErrors[0] });
     }
 
-    const availCheck = checkRoomAvailability(date, roomType);
+    const suiteCount = Number(req.body.suiteCount) || 0;
+    const dormBedCount = Number(req.body.dormBedCount) || 0;
+    const roomCount = Math.max(1, Number(req.body.roomCount) || (suiteCount + dormBedCount) || 1);
+    const availCheck = checkRoomAvailability(actualCheckIn, roomType, suiteCount, dormBedCount);
     if (!availCheck.available) {
       return res.status(400).json({ success: false, error: availCheck.error });
     }
 
     const bookingId = id || ('MSR-RZP-' + Math.floor(100000 + Math.random() * 900000));
-    const calculatedAmount = Number(amount) || (roomType.includes('Dormitory') ? roomPrices.dormPrice : roomPrices.suitePrice);
+    const calculatedAmount = Number(amount) || calculateStayAmount(actualCheckIn, actualCheckOut, roomType, suiteCount, dormBedCount);
 
     const newBooking = {
       id: bookingId,
       name: name.trim(),
       email: email.trim().toLowerCase(),
       phone: phone ? phone.trim() : '',
-      date,
+      date: actualCheckIn,
+      checkInDate: actualCheckIn,
+      checkOutDate: actualCheckOut,
+      roomCount,
       roomType,
       amount: calculatedAmount,
       paymentMethod: 'Online Pre-payment (Razorpay)',
@@ -1230,8 +1298,10 @@ app.post('/api/admin/bookings/walkin', requireAuth(['admin', 'manager', 'recepti
   }
 
   const bookingId = 'MSR-CTR-' + Math.floor(100000 + Math.random() * 900000);
-  const roomCount = Math.max(1, Number(req.body.roomCount) || 1);
-  const calculatedAmount = Number(amount) || (calculateStayAmount(actualCheckIn, actualCheckOut, roomType) * roomCount);
+  const suiteCount = Number(req.body.suiteCount) || 0;
+  const dormBedCount = Number(req.body.dormBedCount) || 0;
+  const roomCount = Math.max(1, Number(req.body.roomCount) || (suiteCount + dormBedCount) || 1);
+  const calculatedAmount = Number(amount) || calculateStayAmount(actualCheckIn, actualCheckOut, roomType, suiteCount, dormBedCount);
 
   const newBooking = {
     id: bookingId,

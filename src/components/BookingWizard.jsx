@@ -9,6 +9,16 @@ export default function BookingWizard({
   checkingAvailability,
   formData,
   handleInputChange,
+  handleSuiteCountChange,
+  handleDormCountChange,
+  suiteCount = 1,
+  dormBedCount = 0,
+  totalUnits = 1,
+  singleSuiteTotal = 2500,
+  singleDormTotal = 450,
+  suiteSubtotal = 2500,
+  dormSubtotal = 0,
+  formattedAccommodation = 'Suite Room',
   handleCheckAvailability,
   handleResetStep,
   handleBookingSubmit,
@@ -17,10 +27,8 @@ export default function BookingWizard({
   suitePrice,
   dormPrice,
   nights = 1,
-  ratePerNight = 2500,
   totalAmount = 2500,
   isSoldOut,
-  selectedAvailableCount,
   bookingError,
   isSubmitting,
 }) {
@@ -36,15 +44,12 @@ export default function BookingWizard({
     return d;
   }, [formData.checkInDate]);
 
-  const isDorm = (formData.roomType || '').includes('Dormitory');
-  const maxUnits = Math.min(
-    isDorm ? 15 : 5,
-    Math.max(1, selectedAvailableCount || (isDorm ? 15 : 5))
-  );
-  const currentUnits = Math.max(1, Number(formData.roomCount) || 1);
-  const unitLabel = isDorm
-    ? currentUnits === 1 ? 'Bed' : 'Beds'
-    : currentUnits === 1 ? 'Room' : 'Rooms';
+  const unitSummaryString = useMemo(() => {
+    const parts = [];
+    if (suiteCount > 0) parts.push(`${suiteCount} ${suiteCount === 1 ? 'Suite' : 'Suites'}`);
+    if (dormBedCount > 0) parts.push(`${dormBedCount} ${dormBedCount === 1 ? 'Dorm Bed' : 'Dorm Beds'}`);
+    return parts.join(' + ') || '0 Units';
+  }, [suiteCount, dormBedCount]);
   return (
     <section id="booking" className="bg-slate-900 px-6 py-20 text-white">
       <div className="mx-auto mb-12 max-w-5xl text-center">
@@ -162,7 +167,7 @@ export default function BookingWizard({
                 </div>
 
                 {/* Duration of Stay Callout */}
-                {formData.checkInDate && formData.checkOutDate && (
+                {formData.checkInDate && formData.checkOutDate && totalUnits > 0 && (
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-slate-950/80 border border-slate-700/80 px-4 py-3 text-xs">
                     <div className="flex flex-wrap items-center gap-2 text-slate-300">
                       <span className="text-base">🌙</span>
@@ -170,9 +175,16 @@ export default function BookingWizard({
                       <span className="font-bold text-white bg-blue-600/40 border border-blue-500/40 px-2.5 py-0.5 rounded-full">
                         {nights} {nights === 1 ? 'Night' : 'Nights'}
                       </span>
-                      <span className="font-bold text-emerald-300 bg-emerald-600/30 border border-emerald-500/40 px-2.5 py-0.5 rounded-full">
-                        {currentUnits} {unitLabel}
-                      </span>
+                      {suiteCount > 0 && (
+                        <span className="font-bold text-blue-300 bg-blue-600/30 border border-blue-500/40 px-2 py-0.5 rounded-full">
+                          {suiteCount} {suiteCount === 1 ? 'Suite Room' : 'Suite Rooms'}
+                        </span>
+                      )}
+                      {dormBedCount > 0 && (
+                        <span className="font-bold text-emerald-300 bg-emerald-600/30 border border-emerald-500/40 px-2 py-0.5 rounded-full">
+                          {dormBedCount} {dormBedCount === 1 ? 'Dorm Bed' : 'Dorm Beds'}
+                        </span>
+                      )}
                     </div>
                     <div className="text-right text-slate-300">
                       <span className="text-slate-400">Total: </span>
@@ -183,79 +195,149 @@ export default function BookingWizard({
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="sm:col-span-2">
-                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-300">
-                      Accommodation Type *
+                {/* Simultaneous Room & Bed Accommodation Selection Cards */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
+                      Select Rooms & Beds (Book One or Both at Once) *
                     </label>
-                    <select
-                      name="roomType"
-                      value={formData.roomType}
-                      onChange={handleInputChange}
-                      className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3.5 text-white outline-none focus:border-blue-500 text-xs sm:text-sm font-medium"
-                    >
-                      <option value="Suite Room (₹2,500/night)">
-                        Suite Room (₹{suitePrice.toLocaleString('en-IN')} / night)
-                      </option>
-                      <option value="Dormitory Bed (₹450/night)">
-                        Dormitory Bed (₹{dormPrice.toLocaleString('en-IN')} / night)
-                      </option>
-                    </select>
+                    <span className="text-xs font-semibold text-slate-400">
+                      Total: <strong className="text-emerald-400 font-bold">{totalUnits} {totalUnits === 1 ? 'Unit' : 'Units'}</strong>
+                    </span>
                   </div>
 
-                  <div>
-                    <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-300">
-                      {isDorm ? 'Beds Count *' : 'Rooms Count *'}
-                    </label>
-                    <select
-                      name="roomCount"
-                      value={currentUnits}
-                      onChange={handleInputChange}
-                      className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3.5 text-white outline-none focus:border-blue-500 text-xs sm:text-sm font-bold text-emerald-400"
-                    >
-                      {Array.from({ length: Math.max(1, maxUnits) }, (_, i) => i + 1).map((num) => (
-                        <option key={num} value={num} className="bg-slate-900 text-white">
-                          {num} {isDorm ? (num === 1 ? 'Bed' : 'Beds') : (num === 1 ? 'Room' : 'Rooms')}
-                        </option>
-                      ))}
-                    </select>
+                  {/* Card 1: Executive Suites */}
+                  <div className={`rounded-2xl border p-4 transition ${
+                    suiteCount > 0 ? 'border-blue-500/60 bg-blue-950/30 ring-1 ring-blue-500/20' : 'border-white/10 bg-slate-900/60'
+                  }`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">🏨</span>
+                          <span className="font-bold text-white text-sm sm:text-base">Executive Suite Room</span>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                            availability.availableSuites > 0
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                          }`}>
+                            {availability.availableSuites} / 5 Available
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          ₹{suitePrice.toLocaleString('en-IN')} / night • Premium private suite with king bed & balcony
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-3.5">
+                        {suiteCount > 0 && formData.checkInDate && formData.checkOutDate && (
+                          <div className="text-right">
+                            <span className="block text-xs font-bold text-blue-300">
+                              ₹{suiteSubtotal.toLocaleString('en-IN')}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block">
+                              ({suiteCount} × ₹{Math.round(singleSuiteTotal / nights)}/n)
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center rounded-xl bg-slate-950 border border-slate-700/80 p-1">
+                          <button
+                            type="button"
+                            onClick={() => handleSuiteCountChange(suiteCount - 1)}
+                            disabled={suiteCount <= 0}
+                            title="Decrease suite count"
+                            className="h-8 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold transition flex items-center justify-center text-sm disabled:opacity-30 disabled:hover:bg-slate-800 cursor-pointer"
+                          >
+                            −
+                          </button>
+                          <span className="w-12 text-center font-bold text-white text-sm">
+                            {suiteCount}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleSuiteCountChange(suiteCount + 1)}
+                            disabled={suiteCount >= availability.availableSuites}
+                            title="Increase suite count"
+                            className="h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold transition flex items-center justify-center text-sm disabled:opacity-30 disabled:hover:bg-blue-600 cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card 2: Dormitory Beds */}
+                  <div className={`rounded-2xl border p-4 transition ${
+                    dormBedCount > 0 ? 'border-emerald-500/60 bg-emerald-950/30 ring-1 ring-emerald-500/20' : 'border-white/10 bg-slate-900/60'
+                  }`}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">🛏️</span>
+                          <span className="font-bold text-white text-sm sm:text-base">Dormitory Bed</span>
+                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold border ${
+                            availability.availableDormBeds > 0
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                              : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                          }`}>
+                            {availability.availableDormBeds} / 15 Available
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          ₹{dormPrice.toLocaleString('en-IN')} / night • Shared bunk bed with personal locker & charging point
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-3.5">
+                        {dormBedCount > 0 && formData.checkInDate && formData.checkOutDate && (
+                          <div className="text-right">
+                            <span className="block text-xs font-bold text-emerald-300">
+                              ₹{dormSubtotal.toLocaleString('en-IN')}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block">
+                              ({dormBedCount} × ₹{Math.round(singleDormTotal / nights)}/n)
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center rounded-xl bg-slate-950 border border-slate-700/80 p-1">
+                          <button
+                            type="button"
+                            onClick={() => handleDormCountChange(dormBedCount - 1)}
+                            disabled={dormBedCount <= 0}
+                            title="Decrease dorm bed count"
+                            className="h-8 w-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-bold transition flex items-center justify-center text-sm disabled:opacity-30 disabled:hover:bg-slate-800 cursor-pointer"
+                          >
+                            −
+                          </button>
+                          <span className="w-12 text-center font-bold text-white text-sm">
+                            {dormBedCount}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleDormCountChange(dormBedCount + 1)}
+                            disabled={dormBedCount >= availability.availableDormBeds}
+                            title="Increase dorm bed count"
+                            className="h-8 w-8 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition flex items-center justify-center text-sm disabled:opacity-30 disabled:hover:bg-emerald-600 cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {availabilityChecked && isSoldOut && (
-                  <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-xs text-rose-300 font-semibold">
-                    ⚠️ Sorry! {formData.roomType.split('(')[0]} is completely <strong>Sold Out</strong> on {formData.checkInDate}. Please choose another date or category.
+                {availabilityChecked && totalUnits < 1 && (
+                  <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-3.5 text-xs text-rose-300 font-semibold">
+                    ⚠️ Please select at least 1 Suite Room or 1 Dormitory Bed above to continue.
                   </div>
                 )}
 
-                {/* Live Capacity Card */}
-                <div className="rounded-2xl bg-slate-900/80 border border-slate-700/80 p-4">
-                  <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-                    Live Total Capacity
+                {availabilityChecked && isSoldOut && (
+                  <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-xs text-rose-300 font-semibold">
+                    ⚠️ Selected accommodation category is completely <strong>Sold Out</strong> or exceeds available capacity on {formData.checkInDate}. Please adjust counts.
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="rounded-xl bg-slate-950 p-3 text-center border border-slate-800">
-                      <span className="block text-slate-400 mb-1">Executive Suites</span>
-                      <span
-                        className={`font-bold text-sm ${
-                          availability.availableSuites > 0 ? 'text-emerald-400' : 'text-rose-400'
-                        }`}
-                      >
-                        {availability.availableSuites} / 5 Available
-                      </span>
-                    </div>
-                    <div className="rounded-xl bg-slate-950 p-3 text-center border border-slate-800">
-                      <span className="block text-slate-400 mb-1">Dormitory Beds</span>
-                      <span
-                        className={`font-bold text-sm ${
-                          availability.availableDormBeds > 0 ? 'text-emerald-400' : 'text-rose-400'
-                        }`}
-                      >
-                        {availability.availableDormBeds} / 15 Available
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                )}
 
                 {!availabilityChecked || isSoldOut ? (
                   <button
@@ -285,7 +367,7 @@ export default function BookingWizard({
                     <span>✅ Accommodation Available!</span>
                   </h4>
                   <p className="text-xs text-slate-300 mt-1">
-                    {formData.roomType.split('(')[0].trim()} • {currentUnits} {unitLabel} • {formData.checkInDate} to {formData.checkOutDate} ({nights} {nights === 1 ? 'night' : 'nights'}) • {selectedAvailableCount} available
+                    {formattedAccommodation} • {formData.checkInDate} to {formData.checkOutDate} ({nights} {nights === 1 ? 'night' : 'nights'})
                   </p>
                 </div>
                 <button
@@ -293,7 +375,7 @@ export default function BookingWizard({
                   onClick={handleResetStep}
                   className="rounded-xl border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-white/20 transition"
                 >
-                  ← Change Date
+                  ← Change Selection
                 </button>
               </div>
 
@@ -372,32 +454,38 @@ export default function BookingWizard({
                 </div>
 
                 {/* Summary Box */}
-                <div className="rounded-2xl border border-slate-700/80 bg-slate-950/80 p-4 space-y-2">
+                <div className="rounded-2xl border border-slate-700/80 bg-slate-950/80 p-4 space-y-2.5">
                   <div className="flex items-center justify-between text-xs text-slate-300">
                     <span>Stay Duration:</span>
                     <span className="font-semibold text-white">
                       {nights} {nights === 1 ? 'Night' : 'Nights'} ({formData.checkInDate} to {formData.checkOutDate})
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-xs text-slate-300">
-                    <span>Accommodation & Units:</span>
-                    <span className="font-semibold text-emerald-300">
-                      {currentUnits} {unitLabel} ({formData.roomType.split('(')[0].trim()})
-                    </span>
+                  <div className="border-t border-slate-800/80 pt-2 space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      <span>Reserved Accommodations</span>
+                      <span className="text-indigo-400 font-semibold normal-case tracking-normal">({unitSummaryString})</span>
+                    </div>
+                    {suiteCount > 0 && (
+                      <div className="flex items-center justify-between text-xs text-slate-200">
+                        <span>🏨 {suiteCount} × Executive Suite Room ({nights}n):</span>
+                        <span className="font-bold text-blue-300">₹{suiteSubtotal.toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
+                    {dormBedCount > 0 && (
+                      <div className="flex items-center justify-between text-xs text-slate-200">
+                        <span>🛏️ {dormBedCount} × Dormitory Bed ({nights}n):</span>
+                        <span className="font-bold text-emerald-300">₹{dormSubtotal.toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center justify-between text-xs text-slate-300">
-                    <span>Rate Calculation:</span>
-                    <span className="font-semibold text-slate-200">
-                      ₹{ratePerNight.toLocaleString('en-IN')}/night × {nights} {nights === 1 ? 'night' : 'nights'} {currentUnits > 1 ? `× ${currentUnits} units` : ''}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs text-slate-300">
-                    <span>Selected Payment Option:</span>
+                  <div className="flex items-center justify-between text-xs text-slate-300 border-t border-slate-800/80 pt-2">
+                    <span>Payment Option:</span>
                     <span className="font-bold text-emerald-400">
                       🏨 Pay at Counter / Arrival
                     </span>
                   </div>
-                  <div className="mt-2 flex items-center justify-between border-t border-slate-800 pt-2 text-sm font-semibold">
+                  <div className="mt-2 flex items-center justify-between border-t border-slate-700 pt-2.5 text-sm font-semibold">
                     <span>Total Amount Due:</span>
                     <span className="text-xl font-extrabold text-emerald-400">
                       ₹{totalAmount.toLocaleString('en-IN')}

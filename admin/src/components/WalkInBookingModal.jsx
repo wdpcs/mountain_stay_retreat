@@ -14,17 +14,34 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
     const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
     return tomorrow.toISOString().split('T')[0];
   });
-  const [roomType, setRoomType] = useState('Suite Room (₹2,500/night)');
-  const [roomCount, setRoomCount] = useState(1);
+  const [suiteCount, setSuiteCount] = useState(1);
+  const [dormBedCount, setDormBedCount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('Cash at Counter');
   const [status, setStatus] = useState('Paid at Counter');
   const [notes, setNotes] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isDorm = (roomType || '').includes('Dormitory');
-  const maxUnits = isDorm ? 15 : 5;
-  const unitLabel = isDorm ? (roomCount === 1 ? 'Bed' : 'Beds') : (roomCount === 1 ? 'Room' : 'Rooms');
+  const totalUnits = suiteCount + dormBedCount;
+  const formattedAccommodation = (() => {
+    if (suiteCount > 0 && dormBedCount > 0) {
+      return `${suiteCount} Suite ${suiteCount === 1 ? 'Room' : 'Rooms'} + ${dormBedCount} Dormitory ${dormBedCount === 1 ? 'Bed' : 'Beds'}`;
+    }
+    if (suiteCount > 0) {
+      return `${suiteCount} Suite ${suiteCount === 1 ? 'Room' : 'Rooms'} (₹${prices?.suitePrice || 2500}/night)`;
+    }
+    if (dormBedCount > 0) {
+      return `${dormBedCount} Dormitory ${dormBedCount === 1 ? 'Bed' : 'Beds'} (₹${prices?.dormPrice || 450}/night)`;
+    }
+    return '1 Suite Room';
+  })();
+
+  const unitsDesc = (() => {
+    const p = [];
+    if (suiteCount > 0) p.push(`${suiteCount} Suite${suiteCount > 1 ? 's' : ''}`);
+    if (dormBedCount > 0) p.push(`${dormBedCount} Dorm Bed${dormBedCount > 1 ? 's' : ''}`);
+    return p.join(', ') || '1 Unit';
+  })();
 
   const calculateNights = (inDate, outDate) => {
     if (!inDate || !outDate) return 1;
@@ -78,9 +95,13 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
   };
 
   const nights = calculateNights(date, checkOutDate);
-  const singleUnitTotal = calculateStayTotal(date, checkOutDate, roomType);
-  const currentPrice = singleUnitTotal * roomCount;
-  const ratePerNight = Math.round(singleUnitTotal / nights);
+  const singleSuiteTotal = calculateStayTotal(date, checkOutDate, 'Suite Room');
+  const singleDormTotal = calculateStayTotal(date, checkOutDate, 'Dormitory Bed');
+  const suiteSubtotal = singleSuiteTotal * suiteCount;
+  const dormSubtotal = singleDormTotal * dormBedCount;
+  const currentPrice = suiteSubtotal + dormSubtotal;
+  const singleSuiteNight = Math.round(singleSuiteTotal / nights);
+  const singleDormNight = Math.round(singleDormTotal / nights);
 
   const handleInDateChange = (newInDate) => {
     setDate(newInDate);
@@ -101,10 +122,15 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
       return;
     }
 
+    if (totalUnits < 1) {
+      setErrorMsg('Please select at least 1 Suite Room or 1 Dormitory Bed.');
+      return;
+    }
+
     setIsSubmitting(true);
     const combinedNotes = [
       notes.trim(),
-      `Stay: ${date} to ${checkOutDate} (${nights} nights) | Units: ${roomCount} ${unitLabel}`,
+      `Stay: ${date} to ${checkOutDate} (${nights} nights) | Units: ${unitsDesc}`,
     ].filter(Boolean).join(' | ');
 
     // 1. Try Node backend API
@@ -123,8 +149,10 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
           checkInDate: date,
           checkOutDate,
           nights,
-          roomType,
-          roomCount,
+          roomType: formattedAccommodation,
+          roomCount: totalUnits,
+          suiteCount,
+          dormBedCount,
           amount: currentPrice,
           paymentMethod,
           status,
@@ -154,8 +182,8 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
         guest_email: cleanEmail,
         guest_phone: cleanPhone,
         check_in_date: date,
-        room_type: roomType,
-        room_count: roomCount,
+        room_type: formattedAccommodation,
+        room_count: totalUnits,
         amount: currentPrice,
         payment_method: 'Pay at Counter / Property',
         status: status || 'Paid at Counter',
@@ -186,7 +214,7 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
             guest_email: cleanEmail,
             guest_phone: cleanPhone,
             check_in_date: date,
-            room_type: roomType,
+            room_type: formattedAccommodation,
             amount: currentPrice,
             payment_method: 'Pay at Counter / Property',
             status: status || 'Paid at Counter',
@@ -315,36 +343,107 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
               />
             </div>
 
-            <div>
-              <label className="block text-slate-700 font-bold mb-1">Accommodation Type</label>
-              <select
-                value={roomType}
-                onChange={(e) => {
-                  setRoomType(e.target.value);
-                  setRoomCount(1);
-                }}
-                className="w-full rounded-2xl border border-slate-300 bg-white p-2.5 text-slate-900 outline-none focus:border-blue-600 font-medium"
-              >
-                <option value="Suite Room (₹2,500/night)">Suite Room (₹{prices?.suitePrice || 2500}/night)</option>
-                <option value="Dormitory Bed (₹450/night)">Dormitory Bed (₹{prices?.dormPrice || 450}/night)</option>
-              </select>
+          </div>
+
+          {/* Accommodation Selection (Suites & Dorm Beds) */}
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between">
+              <label className="block text-slate-700 font-bold">
+                Select Accommodations *
+              </label>
+              <span className="text-[11px] font-semibold text-slate-500">
+                Book multiple rooms, beds, or both at once
+              </span>
             </div>
 
-            <div>
-              <label className="block text-slate-700 font-bold mb-1">
-                {isDorm ? 'Beds Count' : 'Rooms Count'}
-              </label>
-              <select
-                value={roomCount}
-                onChange={(e) => setRoomCount(Number(e.target.value) || 1)}
-                className="w-full rounded-2xl border border-slate-300 bg-white p-2.5 text-emerald-700 font-bold outline-none focus:border-blue-600 font-medium"
-              >
-                {Array.from({ length: maxUnits }, (_, i) => i + 1).map((num) => (
-                  <option key={num} value={num}>
-                    {num} {isDorm ? (num === 1 ? 'Bed' : 'Beds') : (num === 1 ? 'Room' : 'Rooms')}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Executive Suite Row */}
+              <div className={`p-3 rounded-2xl border transition ${suiteCount > 0 ? 'border-blue-500 bg-blue-50/40 shadow-xs' : 'border-slate-200 bg-white'}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-xs">Executive Suite Room</h4>
+                    <span className="text-[10px] text-slate-500 block">
+                      ₹{singleSuiteNight.toLocaleString('en-IN')}/night × {nights}n = ₹{singleSuiteTotal.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <span className="rounded-lg bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800">
+                    Max 5
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSuiteCount((prev) => Math.max(0, prev - 1))}
+                      disabled={suiteCount <= 0}
+                      className="w-7 h-7 rounded-lg border border-slate-300 bg-white font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 flex items-center justify-center transition"
+                    >
+                      -
+                    </button>
+                    <span className="w-6 text-center font-extrabold text-sm text-slate-900">
+                      {suiteCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setSuiteCount((prev) => Math.min(5, prev + 1))}
+                      disabled={suiteCount >= 5}
+                      className="w-7 h-7 rounded-lg border border-slate-300 bg-white font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 flex items-center justify-center transition"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 block">Subtotal</span>
+                    <span className="font-bold text-xs text-blue-700">
+                      ₹{suiteSubtotal.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dormitory Bed Row */}
+              <div className={`p-3 rounded-2xl border transition ${dormBedCount > 0 ? 'border-emerald-500 bg-emerald-50/40 shadow-xs' : 'border-slate-200 bg-white'}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-xs">Dormitory Bed</h4>
+                    <span className="text-[10px] text-slate-500 block">
+                      ₹{singleDormNight.toLocaleString('en-IN')}/night × {nights}n = ₹{singleDormTotal.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                  <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
+                    Max 15
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDormBedCount((prev) => Math.max(0, prev - 1))}
+                      disabled={dormBedCount <= 0}
+                      className="w-7 h-7 rounded-lg border border-slate-300 bg-white font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 flex items-center justify-center transition"
+                    >
+                      -
+                    </button>
+                    <span className="w-6 text-center font-extrabold text-sm text-slate-900">
+                      {dormBedCount}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDormBedCount((prev) => Math.min(15, prev + 1))}
+                      disabled={dormBedCount >= 15}
+                      className="w-7 h-7 rounded-lg border border-slate-300 bg-white font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 flex items-center justify-center transition"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-slate-400 block">Subtotal</span>
+                    <span className="font-bold text-xs text-emerald-700">
+                      ₹{dormSubtotal.toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -355,17 +454,14 @@ export default function WalkInBookingModal({ isOpen, onClose, token, prices, onB
               <span className="font-bold text-slate-900 bg-white border border-slate-200 px-2 py-0.5 rounded-lg">
                 {nights} {nights === 1 ? 'Night' : 'Nights'}
               </span>
-              <span className="font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
-                {roomCount} {unitLabel}
+              <span className="font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg">
+                {unitsDesc}
               </span>
             </div>
             <div className="text-right">
               <span className="text-slate-500 mr-1.5">Total Tariff:</span>
               <span className="text-base font-extrabold text-emerald-700">
                 ₹{currentPrice.toLocaleString('en-IN')}
-              </span>
-              <span className="block text-[10px] text-slate-400">
-                (₹{ratePerNight.toLocaleString('en-IN')}/night × {nights}n × {roomCount}u)
               </span>
             </div>
           </div>

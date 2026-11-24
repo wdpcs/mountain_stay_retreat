@@ -45,14 +45,14 @@ export default function BookingModal({ bookingConfirmation, onClose }) {
               {bookingConfirmation.nights || 1} {(bookingConfirmation.nights || 1) === 1 ? 'Night' : 'Nights'}
             </span>
           </div>
-          <div className="flex justify-between">
-            <span className="text-slate-500">Accommodation:</span>
-            <span className="font-semibold text-slate-800">{bookingConfirmation.roomType}</span>
+          <div className="flex justify-between items-start">
+            <span className="text-slate-500 shrink-0">Accommodation:</span>
+            <span className="font-semibold text-slate-800 text-right">{bookingConfirmation.roomType}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-500">Units Reserved:</span>
             <span className="font-bold text-emerald-700">
-              {bookingConfirmation.roomCount || 1} {(bookingConfirmation.roomType || '').includes('Dormitory') ? ((bookingConfirmation.roomCount || 1) === 1 ? 'Bed' : 'Beds') : ((bookingConfirmation.roomCount || 1) === 1 ? 'Room' : 'Rooms')}
+              {bookingConfirmation.roomCount || 1} {bookingConfirmation.suiteCount > 0 && bookingConfirmation.dormBedCount > 0 ? `(${bookingConfirmation.suiteCount} Suites + ${bookingConfirmation.dormBedCount} Beds)` : ((bookingConfirmation.roomType || '').includes('Dormitory') ? ((bookingConfirmation.roomCount || 1) === 1 ? 'Bed' : 'Beds') : ((bookingConfirmation.roomCount || 1) === 1 ? 'Room' : 'Rooms'))}
             </span>
           </div>
           <div className="flex justify-between">

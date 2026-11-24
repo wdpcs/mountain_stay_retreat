@@ -73,6 +73,8 @@ export default function StayFacilityWebsite() {
     phone: '',
     checkInDate: '',
     checkOutDate: '',
+    suiteCount: 1,
+    dormBedCount: 0,
     roomType: 'Suite Room (₹2,500/night)',
     roomCount: 1,
   });
@@ -152,15 +154,41 @@ export default function StayFacilityWebsite() {
   };
 
   const nights = calculateNights(formData.checkInDate, formData.checkOutDate);
-  const roomCount = Math.max(1, Number(formData.roomCount) || 1);
-  const singleUnitTotal = calculateStayTotal(
+  const suiteCount = Math.max(0, Number(formData.suiteCount) || 0);
+  const dormBedCount = Math.max(0, Number(formData.dormBedCount) || 0);
+  const totalUnits = suiteCount + dormBedCount;
+
+  // Single unit stay totals for each category
+  const singleSuiteTotal = calculateStayTotal(
     formData.checkInDate,
     formData.checkOutDate,
-    formData.roomType,
+    'Suite Room',
     availability
   );
-  const ratePerNight = Math.round(singleUnitTotal / nights);
-  const totalAmount = singleUnitTotal * roomCount;
+  const singleDormTotal = calculateStayTotal(
+    formData.checkInDate,
+    formData.checkOutDate,
+    'Dormitory Bed',
+    availability
+  );
+
+  const suiteSubtotal = singleSuiteTotal * suiteCount;
+  const dormSubtotal = singleDormTotal * dormBedCount;
+  const totalAmount = suiteSubtotal + dormSubtotal;
+  const ratePerNight = Math.round(totalAmount / (nights * Math.max(1, totalUnits)));
+
+  const formattedAccommodation = (() => {
+    if (suiteCount > 0 && dormBedCount > 0) {
+      return `${suiteCount} Suite ${suiteCount === 1 ? 'Room' : 'Rooms'} + ${dormBedCount} Dormitory ${dormBedCount === 1 ? 'Bed' : 'Beds'}`;
+    }
+    if (suiteCount > 0) {
+      return `${suiteCount} Suite ${suiteCount === 1 ? 'Room' : 'Rooms'} (₹${suitePrice.toLocaleString('en-IN')}/night)`;
+    }
+    if (dormBedCount > 0) {
+      return `${dormBedCount} Dormitory ${dormBedCount === 1 ? 'Bed' : 'Beds'} (₹${dormPrice.toLocaleString('en-IN')}/night)`;
+    }
+    return '1 Suite Room (₹2,500/night)';
+  })();
 
   const roomAmounts = {
     'Suite Room (₹2,500/night)': suitePrice,
@@ -210,9 +238,21 @@ export default function StayFacilityWebsite() {
       }
       return next;
     });
-    if (name === 'checkInDate' || name === 'checkOutDate' || name === 'roomType' || name === 'roomCount') {
+    if (name === 'checkInDate' || name === 'checkOutDate' || name === 'roomType' || name === 'roomCount' || name === 'suiteCount' || name === 'dormBedCount') {
       setAvailabilityChecked(false);
     }
+  };
+
+  const handleSuiteCountChange = (val) => {
+    const nextCount = Math.max(0, Math.min(availability.availableSuites, Number(val) || 0));
+    setFormData((prev) => ({ ...prev, suiteCount: nextCount }));
+    setAvailabilityChecked(false);
+  };
+
+  const handleDormCountChange = (val) => {
+    const nextCount = Math.max(0, Math.min(availability.availableDormBeds, Number(val) || 0));
+    setFormData((prev) => ({ ...prev, dormBedCount: nextCount }));
+    setAvailabilityChecked(false);
   };
 
   const handleCheckAvailability = async (e) => {
@@ -229,6 +269,10 @@ export default function StayFacilityWebsite() {
       alert('Check-out date must be after Check-in date (at least 1 night stay).');
       return;
     }
+    if (totalUnits < 1) {
+      alert('Please select at least 1 Suite Room or 1 Dormitory Bed.');
+      return;
+    }
 
     setCheckingAvailability(true);
     await fetchAvailability(formData.checkInDate);
@@ -241,11 +285,17 @@ export default function StayFacilityWebsite() {
     setAvailabilityChecked(false);
   };
 
-  const selectedAvailableCount = formData.roomType.includes('Suite')
-    ? availability.availableSuites
-    : availability.availableDormBeds;
+  const isSoldOut =
+    (availability.availableSuites <= 0 && availability.availableDormBeds <= 0) ||
+    (suiteCount > availability.availableSuites) ||
+    (dormBedCount > availability.availableDormBeds);
 
-  const isSoldOut = selectedAvailableCount <= 0;
+  const selectedAvailableCount =
+    suiteCount > 0 && dormBedCount > 0
+      ? Math.min(availability.availableSuites, availability.availableDormBeds)
+      : suiteCount > 0
+      ? availability.availableSuites
+      : availability.availableDormBeds;
 
   const validateGuestForm = () => {
     if (!formData.fullName || formData.fullName.trim().length < 2) {
@@ -274,12 +324,14 @@ export default function StayFacilityWebsite() {
     if (bookingDate < today) {
       return 'Check-in date cannot be in the past.';
     }
-    if (isSoldOut) {
-      return 'Sorry, this accommodation is fully booked or under maintenance on the selected date.';
+    if (totalUnits < 1) {
+      return 'Please select at least 1 Suite Room or 1 Dormitory Bed.';
     }
-    const isDorm = formData.roomType.includes('Dormitory');
-    if (roomCount > selectedAvailableCount) {
-      return `Only ${selectedAvailableCount} ${isDorm ? 'bed(s)' : 'suite(s)'} available on the selected date. Please reduce your requested quantity.`;
+    if (suiteCount > availability.availableSuites) {
+      return `Only ${availability.availableSuites} Executive Suite(s) available on the selected date. Please reduce suite count.`;
+    }
+    if (dormBedCount > availability.availableDormBeds) {
+      return `Only ${availability.availableDormBeds} Dormitory Bed(s) available on the selected date. Please reduce bed count.`;
     }
     return null;
   };
@@ -309,8 +361,10 @@ export default function StayFacilityWebsite() {
         checkInDate: formData.checkInDate,
         checkOutDate: formData.checkOutDate,
         nights,
-        roomType: formData.roomType,
-        roomCount,
+        suiteCount,
+        dormBedCount,
+        roomType: formattedAccommodation,
+        roomCount: totalUnits,
         amount: totalAmount,
         ratePerNight,
       });
@@ -325,8 +379,10 @@ export default function StayFacilityWebsite() {
           checkInDate: formData.checkInDate,
           checkOutDate: formData.checkOutDate,
           nights,
-          roomType: formData.roomType,
-          roomCount,
+          suiteCount,
+          dormBedCount,
+          roomType: formattedAccommodation,
+          roomCount: totalUnits,
           paymentMethod: 'Pay at Counter / Property',
           status: 'Pending at Check-in',
           amount: totalAmount,
@@ -376,6 +432,16 @@ export default function StayFacilityWebsite() {
         checkingAvailability={checkingAvailability}
         formData={formData}
         handleInputChange={handleInputChange}
+        handleSuiteCountChange={handleSuiteCountChange}
+        handleDormCountChange={handleDormCountChange}
+        suiteCount={suiteCount}
+        dormBedCount={dormBedCount}
+        totalUnits={totalUnits}
+        singleSuiteTotal={singleSuiteTotal}
+        singleDormTotal={singleDormTotal}
+        suiteSubtotal={suiteSubtotal}
+        dormSubtotal={dormSubtotal}
+        formattedAccommodation={formattedAccommodation}
         handleCheckAvailability={handleCheckAvailability}
         handleResetStep={handleResetStep}
         handleBookingSubmit={handleBookingSubmit}
@@ -415,6 +481,8 @@ export default function StayFacilityWebsite() {
             phone: '',
             checkInDate: '',
             checkOutDate: '',
+            suiteCount: 1,
+            dormBedCount: 0,
             roomType: 'Suite Room (₹2,500/night)',
             roomCount: 1,
           });

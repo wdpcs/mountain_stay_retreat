@@ -110,23 +110,45 @@ export async function getRoomAvailability(dateStr = '') {
           return inDate === dStr;
         };
 
-        const getRowUnits = (b) => {
-          if (b.room_count) return Number(b.room_count) || 1;
-          if (b.roomCount) return Number(b.roomCount) || 1;
-          if (b.notes && b.notes.includes('Units:')) {
-            const m = b.notes.match(/Units:\s*(\d+)/i);
-            if (m) return Number(m[1]) || 1;
+        const getRowCounts = (b) => {
+          let sCount = 0;
+          let dCount = 0;
+          const rType = b.room_type || b.roomType || '';
+          const notes = b.notes || '';
+
+          // 1. Check notes for exact breakdown: e.g. "Units: 2 Suites, 3 Dorm Beds"
+          if (notes.includes('Units:')) {
+            const sMatch = notes.match(/(\d+)\s*Suite/i);
+            const dMatch = notes.match(/(\d+)\s*Dorm/i);
+            if (sMatch) sCount = Number(sMatch[1]) || 0;
+            if (dMatch) dCount = Number(dMatch[1]) || 0;
           }
-          return 1;
+
+          // 2. If both not found from notes, infer from room_type
+          if (!sCount && !dCount) {
+            const total = Number(b.room_count || b.roomCount) || 1;
+            if (rType.includes('Suite') && rType.includes('Dorm')) {
+              const sMatch = rType.match(/(\d+)\s*Suite/i);
+              const dMatch = rType.match(/(\d+)\s*Dorm/i);
+              sCount = sMatch ? Number(sMatch[1]) : 1;
+              dCount = dMatch ? Number(dMatch[1]) : 1;
+            } else if (rType.includes('Suite')) {
+              sCount = total;
+            } else if (rType.includes('Dormitory') || rType.includes('Dorm')) {
+              dCount = total;
+            }
+          }
+
+          return { suites: sCount, dorms: dCount };
         };
 
         const bookedSuites = activeRows
-          .filter((b) => isRowActiveOnDate(b, targetDate) && (b.room_type || b.roomType || '').includes('Suite'))
-          .reduce((sum, b) => sum + getRowUnits(b), 0);
+          .filter((b) => isRowActiveOnDate(b, targetDate))
+          .reduce((sum, b) => sum + getRowCounts(b).suites, 0);
 
         const bookedDorms = activeRows
-          .filter((b) => isRowActiveOnDate(b, targetDate) && (b.room_type || b.roomType || '').includes('Dormitory'))
-          .reduce((sum, b) => sum + getRowUnits(b), 0);
+          .filter((b) => isRowActiveOnDate(b, targetDate))
+          .reduce((sum, b) => sum + getRowCounts(b).dorms, 0);
 
         const finalPrices = cloudPrices || DEFAULT_SETTINGS.roomPrices;
 
@@ -204,13 +226,20 @@ export async function submitCounterBooking(bookingData) {
   const checkInDate = bookingData.checkInDate || bookingData.date;
   const checkOutDate = bookingData.checkOutDate || '';
   const nights = bookingData.nights || 1;
-  const roomCount = Math.max(1, Number(bookingData.roomCount) || 1);
-  const isDorm = (bookingData.roomType || '').includes('Dormitory');
-  const unitLabel = isDorm ? (roomCount === 1 ? 'Bed' : 'Beds') : (roomCount === 1 ? 'Room' : 'Rooms');
+  const suiteCount = Math.max(0, Number(bookingData.suiteCount) || 0);
+  const dormBedCount = Math.max(0, Number(bookingData.dormBedCount) || 0);
+  const roomCount = Math.max(1, Number(bookingData.roomCount) || (suiteCount + dormBedCount) || 1);
+
+  const unitsDesc = (() => {
+    const parts = [];
+    if (suiteCount > 0) parts.push(`${suiteCount} Suite${suiteCount > 1 ? 's' : ''}`);
+    if (dormBedCount > 0) parts.push(`${dormBedCount} Dorm Bed${dormBedCount > 1 ? 's' : ''}`);
+    return parts.join(', ') || `${roomCount} Units`;
+  })();
 
   const stayNote = checkOutDate
-    ? `Stay: ${checkInDate} to ${checkOutDate} (${nights} ${nights === 1 ? 'night' : 'nights'}) | Units: ${roomCount} ${unitLabel}`
-    : `Units: ${roomCount} ${unitLabel}`;
+    ? `Stay: ${checkInDate} to ${checkOutDate} (${nights} ${nights === 1 ? 'night' : 'nights'}) | Units: ${unitsDesc}`
+    : `Units: ${unitsDesc}`;
   const combinedNotes = [bookingData.notes, stayNote].filter(Boolean).join(' | ');
 
   const baseRecord = {
@@ -243,6 +272,8 @@ export async function submitCounterBooking(bookingData) {
     checkInDate,
     checkOutDate,
     nights,
+    suiteCount,
+    dormBedCount,
     roomCount,
     roomType: bookingData.roomType,
     paymentMethod: 'Pay at Counter / Property',
@@ -478,9 +509,15 @@ export async function lookupBooking(searchQuery) {
             if (!nights) nights = 1;
 
             let roomCount = Number(b.room_count || b.roomCount) || 0;
-            if (!roomCount && notes.includes('Units:')) {
+            let sCount = 0;
+            let dCount = 0;
+            if (notes.includes('Units:')) {
               const uMatch = notes.match(/Units:\s*(\d+)/i);
               if (uMatch) roomCount = Number(uMatch[1]) || 1;
+              const sMatch = notes.match(/(\d+)\s*Suite/i);
+              const dMatch = notes.match(/(\d+)\s*Dorm/i);
+              if (sMatch) sCount = Number(sMatch[1]) || 0;
+              if (dMatch) dCount = Number(dMatch[1]) || 0;
             }
             if (!roomCount) roomCount = 1;
 
@@ -494,6 +531,8 @@ export async function lookupBooking(searchQuery) {
               checkInDate: checkIn,
               checkOutDate: checkOut,
               nights,
+              suiteCount: sCount,
+              dormBedCount: dCount,
               roomCount,
               roomType: b.room_type || b.roomType || '',
               amount: Number(b.amount) || 0,
